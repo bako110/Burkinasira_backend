@@ -103,6 +103,21 @@ async def update_artisan(user_id: str, data: UpdateArtisanRequest) -> ArtisanRes
     return await get_artisan(str(doc["_id"]))
 
 
+async def update_artisan_by_id(artisan_id: str, data: UpdateArtisanRequest) -> ArtisanResponse:
+    """(Admin) Mettre à jour le profil d'un artisan par son identifiant."""
+    db = get_database()
+    if not ObjectId.is_valid(artisan_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profil artisan introuvable")
+    doc = await db[ARTISANS_COLLECTION].find_one({"_id": ObjectId(artisan_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profil artisan introuvable")
+    update_fields = data.model_dump(exclude_unset=True, exclude_none=True)
+    if update_fields:
+        update_fields["updated_at"] = datetime.utcnow()
+        await db[ARTISANS_COLLECTION].update_one({"_id": doc["_id"]}, {"$set": update_fields})
+    return await get_artisan(artisan_id)
+
+
 async def delete_artisan(user_id: str, is_admin: bool = False, target_artisan_id: Optional[str] = None) -> None:
     db = get_database()
     if target_artisan_id:

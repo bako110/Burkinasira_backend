@@ -75,6 +75,16 @@ async def delete_my_artisan_profile(
     await artisan_service.delete_artisan(current_user.sub)
 
 
+@router.patch("/artisans/{artisan_id}", response_model=ArtisanResponse)
+async def update_artisan_by_id(
+    artisan_id: str,
+    data: UpdateArtisanRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Mettre à jour le profil d'un artisan par son identifiant."""
+    return await artisan_service.update_artisan_by_id(artisan_id, data)
+
+
 @router.delete("/artisans/{artisan_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_artisan(
     artisan_id: str,

@@ -74,6 +74,16 @@ async def delete_my_guide_profile(
     await guide_service.delete_guide_profile(current_user.sub)
 
 
+@router.patch("/{guide_id}", response_model=GuideDetail)
+async def update_guide_profile_by_id(
+    guide_id: str,
+    data: UpdateGuideProfileRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Mettre à jour le profil d'un guide par son identifiant."""
+    return await guide_service.update_guide_profile_by_id(guide_id, data)
+
+
 @router.delete("/{guide_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_guide_profile(
     guide_id: str,

@@ -146,6 +146,23 @@ async def update_guide_profile(user_id: str, data: UpdateGuideProfileRequest) ->
     return await get_guide(str(doc["_id"]))
 
 
+async def update_guide_profile_by_id(guide_id: str, data: UpdateGuideProfileRequest) -> GuideDetail:
+    """(Admin) Mettre à jour le profil d'un guide par son identifiant."""
+    db = get_database()
+    if not ObjectId.is_valid(guide_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profil guide introuvable")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(guide_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profil guide introuvable")
+
+    update_fields = data.model_dump(exclude_unset=True, exclude_none=True)
+    if update_fields:
+        update_fields["updated_at"] = datetime.utcnow()
+        await db[COLLECTION].update_one({"_id": doc["_id"]}, {"$set": update_fields})
+
+    return await get_guide(guide_id)
+
+
 async def set_verification_status(guide_id: str, is_verified: bool) -> GuideDetail:
     """(Admin) Vérifier ou retirer la vérification d'un guide (§37 GoTours Verified)."""
     db = get_database()
