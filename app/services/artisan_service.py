@@ -136,6 +136,37 @@ async def delete_artisan(user_id: str, is_admin: bool = False, target_artisan_id
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profil artisan introuvable")
 
 
+OFFICIAL_ARTISAN_NAME = "GoTours"
+
+
+async def get_or_create_official_artisan(admin_user_id: str) -> ArtisanResponse:
+    """Profil artisan officiel utilisé pour les produits ajoutés directement par l'admin,
+    sans artisan associé (vitrine GoTours)."""
+    db = get_database()
+    doc = await db[ARTISANS_COLLECTION].find_one({"display_name": OFFICIAL_ARTISAN_NAME, "user_id": admin_user_id})
+    if doc:
+        return _artisan_to_response(doc)
+
+    now = datetime.utcnow()
+    doc = {
+        "user_id": admin_user_id,
+        "display_name": OFFICIAL_ARTISAN_NAME,
+        "story": "Produits proposés directement par la plateforme GoTours.",
+        "photo_url": None,
+        "region": "Centre",
+        "city": None,
+        "is_verified": True,
+        "status": ArtisanStatus.ACTIVE.value,
+        "average_rating": 0.0,
+        "review_count": 0,
+        "created_at": now,
+        "updated_at": now,
+    }
+    result = await db[ARTISANS_COLLECTION].insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return _artisan_to_response(doc)
+
+
 async def set_verification_status(artisan_id: str, is_verified: bool) -> ArtisanResponse:
     db = get_database()
     if not ObjectId.is_valid(artisan_id):
@@ -241,14 +272,16 @@ async def get_product(product_id: str) -> ProductDetail:
     return _product_to_detail(doc)
 
 
-async def update_product(product_id: str, data: UpdateProductRequest, current_artisan_id: str) -> ProductDetail:
+async def update_product(
+    product_id: str, data: UpdateProductRequest, current_artisan_id: Optional[str], is_admin: bool = False
+) -> ProductDetail:
     db = get_database()
     if not ObjectId.is_valid(product_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produit introuvable")
     doc = await db[PRODUCTS_COLLECTION].find_one({"_id": ObjectId(product_id)})
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produit introuvable")
-    if doc["artisan_id"] != current_artisan_id:
+    if not is_admin and doc["artisan_id"] != current_artisan_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez modifier que vos propres produits")
 
     update_fields = data.model_dump(exclude_unset=True, exclude_none=True)
@@ -259,14 +292,14 @@ async def update_product(product_id: str, data: UpdateProductRequest, current_ar
     return await get_product(product_id)
 
 
-async def delete_product(product_id: str, current_artisan_id: str) -> None:
+async def delete_product(product_id: str, current_artisan_id: Optional[str], is_admin: bool = False) -> None:
     db = get_database()
     if not ObjectId.is_valid(product_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produit introuvable")
     doc = await db[PRODUCTS_COLLECTION].find_one({"_id": ObjectId(product_id)})
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produit introuvable")
-    if doc["artisan_id"] != current_artisan_id:
+    if not is_admin and doc["artisan_id"] != current_artisan_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez supprimer que vos propres produits")
     await db[PRODUCTS_COLLECTION].delete_one({"_id": ObjectId(product_id)})
 

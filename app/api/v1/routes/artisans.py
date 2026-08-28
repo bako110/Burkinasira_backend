@@ -127,9 +127,13 @@ async def create_product(
     data: CreateProductRequest,
     current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
 ):
-    """(Vendeur) Ajouter un produit à son catalogue. (Admin) Ajouter un produit pour un artisan donné."""
-    if current_user.role == UserRole.ADMIN and data.artisan_id:
-        artisan_id = data.artisan_id
+    """(Vendeur) Ajouter un produit à son catalogue. (Admin) Ajouter un produit pour un artisan donné, ou pour la vitrine GoTours si aucun n'est précisé."""
+    if current_user.role == UserRole.ADMIN:
+        if data.artisan_id:
+            artisan_id = data.artisan_id
+        else:
+            artisan = await artisan_service.get_or_create_official_artisan(current_user.sub)
+            artisan_id = artisan.id
     else:
         artisan = await artisan_service.get_artisan_by_user_id(current_user.sub)
         artisan_id = artisan.id
@@ -142,9 +146,11 @@ async def update_product(
     data: UpdateProductRequest,
     current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
 ):
-    """(Vendeur) Mettre à jour un produit, gérer les stocks."""
+    """(Vendeur) Mettre à jour un produit, gérer les stocks. (Admin) Mettre à jour n'importe quel produit."""
+    if current_user.role == UserRole.ADMIN:
+        return await artisan_service.update_product(product_id, data, current_artisan_id=None, is_admin=True)
     artisan = await artisan_service.get_artisan_by_user_id(current_user.sub)
-    return await artisan_service.update_product(product_id, data, artisan.id)
+    return await artisan_service.update_product(product_id, data, current_artisan_id=artisan.id)
 
 
 @router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -152,9 +158,12 @@ async def delete_product(
     product_id: str,
     current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
 ):
-    """(Vendeur) Supprimer un produit."""
+    """(Vendeur) Supprimer un produit. (Admin) Supprimer n'importe quel produit."""
+    if current_user.role == UserRole.ADMIN:
+        await artisan_service.delete_product(product_id, current_artisan_id=None, is_admin=True)
+        return
     artisan = await artisan_service.get_artisan_by_user_id(current_user.sub)
-    await artisan_service.delete_product(product_id, artisan.id)
+    await artisan_service.delete_product(product_id, current_artisan_id=artisan.id)
 
 
 @router.post("/orders", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
