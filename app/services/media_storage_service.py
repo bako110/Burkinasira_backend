@@ -7,6 +7,7 @@ from app.core.config import settings
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/webm"}
+ALLOWED_DOCUMENT_TYPES = {"application/pdf"}
 MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024  # 15 Mo
 
 EXTENSION_BY_CONTENT_TYPE = {
@@ -17,6 +18,7 @@ EXTENSION_BY_CONTENT_TYPE = {
     "video/mp4": ".mp4",
     "video/quicktime": ".mov",
     "video/webm": ".webm",
+    "application/pdf": ".pdf",
 }
 
 UPLOAD_ROOT = Path(settings.UPLOAD_DIR)
@@ -27,11 +29,12 @@ async def upload_media(file: UploadFile, folder: str = "gotours") -> dict:
     content_type = file.content_type or ""
     is_image = content_type in ALLOWED_IMAGE_TYPES
     is_video = content_type in ALLOWED_VIDEO_TYPES
+    is_document = content_type in ALLOWED_DOCUMENT_TYPES
 
-    if not is_image and not is_video:
+    if not is_image and not is_video and not is_document:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Format de fichier non supporté (images JPEG/PNG/WEBP/GIF ou vidéos MP4/MOV/WEBM uniquement)",
+            detail="Format de fichier non supporté (images JPEG/PNG/WEBP/GIF, vidéos MP4/MOV/WEBM ou documents PDF uniquement)",
         )
 
     contents = await file.read()
@@ -63,9 +66,16 @@ async def upload_media(file: UploadFile, folder: str = "gotours") -> dict:
 
     public_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/uploads/{safe_folder}/{filename}"
 
+    if is_video:
+        resource_type = "video"
+    elif is_document:
+        resource_type = "document"
+    else:
+        resource_type = "image"
+
     return {
         "url": public_url,
-        "resource_type": "video" if is_video else "image",
+        "resource_type": resource_type,
         "width": width,
         "height": height,
         "duration": duration,
