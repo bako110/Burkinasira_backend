@@ -43,6 +43,7 @@ class CreateProductRequest(BaseModel):
     photos: List[str] = []
     stock_quantity: int = Field(default=0, ge=0)
     fulfillment_mode: FulfillmentMode = FulfillmentMode.LES_DEUX
+    artisan_id: Optional[str] = None
 
 
 class UpdateProductRequest(BaseModel):

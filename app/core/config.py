@@ -23,11 +23,10 @@ class Settings(BaseSettings):
     # CORS - REQUIS: À définir via variables d'environnement
     # Utilisez "*" pour accepter toutes les origines ou liste séparée par virgules
     ALLOWED_ORIGINS: str
-    
-    # Cloudinary - REQUIS: À définir via variables d'environnement
-    CLOUDINARY_CLOUD_NAME: str
-    CLOUDINARY_API_KEY: str
-    CLOUDINARY_API_SECRET: str
+
+    # Stockage des médias (images/vidéos) sur le disque du serveur
+    UPLOAD_DIR: str = "uploads"
+    PUBLIC_BASE_URL: str = "http://localhost:8000"
     
     @property
     def cors_origins(self) -> list:

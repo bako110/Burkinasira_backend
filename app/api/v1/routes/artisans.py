@@ -117,9 +117,13 @@ async def create_product(
     data: CreateProductRequest,
     current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
 ):
-    """(Vendeur) Ajouter un produit à son catalogue."""
-    artisan = await artisan_service.get_artisan_by_user_id(current_user.sub)
-    return await artisan_service.create_product(data, artisan_id=artisan.id)
+    """(Vendeur) Ajouter un produit à son catalogue. (Admin) Ajouter un produit pour un artisan donné."""
+    if current_user.role == UserRole.ADMIN and data.artisan_id:
+        artisan_id = data.artisan_id
+    else:
+        artisan = await artisan_service.get_artisan_by_user_id(current_user.sub)
+        artisan_id = artisan.id
+    return await artisan_service.create_product(data, artisan_id=artisan_id)
 
 
 @router.patch("/products/{product_id}", response_model=ProductDetail)

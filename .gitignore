@@ -65,3 +65,6 @@ Thumbs.db
 temp/
 tmp/
 .scratch/
+
+# Médias téléversés par les utilisateurs
+/uploads/

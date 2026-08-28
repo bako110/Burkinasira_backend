@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.database import connect_to_mongo, close_mongo_connection
 from app.api.v1.routes import (
@@ -36,6 +39,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Fichiers médias téléversés (images/vidéos), servis directement par le serveur
+Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 # Événements de cycle de vie
 @app.on_event("startup")
@@ -294,7 +301,7 @@ app.include_router(privacy.router, prefix=settings.API_V1_PREFIX)
 app.include_router(home.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES MÉDIAS (upload Cloudinary)
+# ROUTES MÉDIAS (upload local vers le serveur)
 # ============================================
 app.include_router(media.router, prefix=settings.API_V1_PREFIX)
 
