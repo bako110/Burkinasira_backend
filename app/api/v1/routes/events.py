@@ -1,220 +1,69 @@
-from fastapi import APIRouter, HTTPException, Query, Depends, status
-from typing import List
-from app.core.security import get_current_user, require_admin
-from app.core.permissions import Permission
-from app.schemas.auth import TokenPayload
+from typing import Optional
+from fastapi import APIRouter, Depends, Query, status
+from app.core.security import get_current_user, require_role
 from app.models.user import UserRole
-from app.schemas.event import EventCreate, EventUpdate, EventResponse
-from app.services.event_service import EventService
-import logging
+from app.models.event import EventCategory
+from app.schemas.auth import TokenPayload
+from app.schemas.event import (
+    CreateEventRequest,
+    UpdateEventRequest,
+    EventDetail,
+    EventListResponse,
+)
+from app.services import event_service
 
-logger = logging.getLogger(__name__)
-
-router = APIRouter(prefix="/events", tags=["Local Events"])
-event_service = EventService()
-
-
-@router.post("/", response_model=dict, status_code=201)
-async def create_event(
-    event: EventCreate,
-    current_user: TokenPayload = Depends(get_current_user)
-):
-    """Créer un événement local (PROVIDER, GUIDE ou ADMIN)"""
-    try:
-        # Providers, Guides et Admins peuvent créer des événements
-        if current_user.role not in [UserRole.PROVIDER, UserRole.GUIDE, UserRole.ADMIN]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Seuls les providers et guides peuvent créer des événements"
-            )
-        
-        event_id = await event_service.create_event(event, current_user.sub)
-        return {"id": event_id, "message": "Événement créé avec succès"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
+router = APIRouter(prefix="/events", tags=["Événements et calendrier national"])
 
 
-@router.get("/", response_model=List[EventResponse])
+@router.get("", response_model=EventListResponse)
 async def list_events(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
-    current_user: TokenPayload = Depends(get_current_user)
+    category: Optional[EventCategory] = None,
+    region: Optional[str] = None,
+    upcoming_only: bool = Query(default=True, description="Uniquement les événements à venir"),
+    q: Optional[str] = Query(default=None, description="Recherche texte (titre, description)"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
 ):
-    """Récupérer tous les événements (authentifié requis)"""
-    try:
-        return await event_service.get_all_events(skip, limit)
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
+    """Rechercher / filtrer un événement (§17)."""
+    return await event_service.list_events(
+        category=category, region=region, upcoming_only=upcoming_only,
+        q=q, page=page, page_size=page_size,
+    )
 
 
-@router.get("/city/{ville}", response_model=List[EventResponse])
-async def get_by_city(
-    ville: str,
-    current_user: TokenPayload = Depends(get_current_user)
+@router.get("/{event_id}", response_model=EventDetail)
+async def get_event(event_id: str):
+    """Détail d'un événement : programme, localisation, transport/hébergement liés."""
+    return await event_service.get_event(event_id)
+
+
+@router.post("", response_model=EventDetail, status_code=status.HTTP_201_CREATED)
+async def create_event(
+    data: CreateEventRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
 ):
-    """Récupérer les événements d'une ville (authentifié requis)"""
-    try:
-        return await event_service.get_events_by_city(ville)
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
+    """(Provider/Admin) Publier un événement."""
+    return await event_service.create_event(data, organizer_id=current_user.sub)
 
 
-@router.get("/upcoming", response_model=List[EventResponse])
-async def get_upcoming(current_user: TokenPayload = Depends(get_current_user)):
-    """Récupérer les événements à venir (authentifié requis)"""
-    try:
-        return await event_service.get_upcoming_events()
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
-
-
-@router.get("/type/{type_event}", response_model=List[EventResponse])
-async def get_by_type(
-    type_event: str,
-    current_user: TokenPayload = Depends(get_current_user)
-):
-    """Récupérer les événements par type (authentifié requis)"""
-    try:
-        return await event_service.get_events_by_type(type_event)
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
-
-
-@router.get("/{event_id}", response_model=EventResponse)
-async def get_one(
+@router.patch("/{event_id}", response_model=EventDetail)
+async def update_event(
     event_id: str,
-    current_user: TokenPayload = Depends(get_current_user)
+    data: UpdateEventRequest,
+    current_user: TokenPayload = Depends(get_current_user),
 ):
-    """Récupérer un événement (authentifié requis)"""
-    try:
-        event = await event_service.get_event(event_id)
-        if not event:
-            raise HTTPException(status_code=404, detail="Événement non trouvé")
-        return event
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
+    """(Organisateur/Admin) Mettre à jour un événement."""
+    return await event_service.update_event(
+        event_id, data, current_user.sub, is_admin=current_user.role == UserRole.ADMIN
+    )
 
 
-@router.put("/{event_id}")
-async def update_one(
+@router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_event(
     event_id: str,
-    event: EventUpdate,
-    current_user: TokenPayload = Depends(get_current_user)
+    current_user: TokenPayload = Depends(get_current_user),
 ):
-    """Mettre à jour un événement (propriétaire ou ADMIN)"""
-    try:
-        existing = await event_service.get_event(event_id)
-        if not existing:
-            raise HTTPException(status_code=404, detail="Événement non trouvé")
-        
-        # Vérifier les permissions
-        if current_user.role != UserRole.ADMIN:
-            if existing.get("organizer_id") != current_user.sub:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Vous ne pouvez modifier que vos propres événements"
-                )
-        
-        success = await event_service.update_event(event_id, event)
-        if not success:
-            raise HTTPException(status_code=404, detail="Événement non trouvé")
-        return {"message": "Événement mis à jour"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
-
-
-@router.delete("/{event_id}")
-async def delete_one(
-    event_id: str,
-    current_user: TokenPayload = Depends(get_current_user)
-):
-    """Supprimer un événement (propriétaire ou ADMIN)"""
-    try:
-        existing = await event_service.get_event(event_id)
-        if not existing:
-            raise HTTPException(status_code=404, detail="Événement non trouvé")
-        
-        # Vérifier les permissions
-        if current_user.role != UserRole.ADMIN:
-            if existing.get("organizer_id") != current_user.sub:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Vous ne pouvez supprimer que vos propres événements"
-                )
-        
-        success = await event_service.delete_event(event_id)
-        if not success:
-            raise HTTPException(status_code=404, detail="Événement non trouvé")
-        return {"message": "Événement supprimé"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
-
-
-# ============ ROUTES POUR PROVIDERS/GUIDES (Mes Événements) ============
-
-@router.get("/me/events", response_model=List[EventResponse])
-async def get_my_events(current_user: TokenPayload = Depends(get_current_user)):
-    """Récupérer mes événements (PROVIDER ou GUIDE)"""
-    try:
-        if current_user.role not in [UserRole.PROVIDER, UserRole.GUIDE, UserRole.ADMIN]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Accès réservé aux providers et guides"
-            )
-        
-        from app.core.database import get_database
-        db = get_database()
-        events = []
-        
-        cursor = db["events"].find({"organizer_id": current_user.sub})
-        async for event in cursor:
-            event["_id"] = str(event["_id"])
-            events.append(event)
-        
-        return events
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
-
-
-# ============ ADMIN GLOBAL VIEWS ============
-
-@router.get("/admin/all", response_model=List[EventResponse])
-async def admin_get_all_events(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    admin: TokenPayload = Depends(require_admin)
-):
-    """Vue globale de tous les événements pour l'admin"""
-    try:
-        from app.core.database import get_database
-        db = get_database()
-        events = []
-        
-        cursor = db["events"].find().skip(skip).limit(limit)
-        async for event in cursor:
-            event["_id"] = str(event["_id"])
-            events.append(event)
-        
-        return events
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
+    """(Organisateur/Admin) Supprimer un événement."""
+    await event_service.delete_event(
+        event_id, current_user.sub, is_admin=current_user.role == UserRole.ADMIN
+    )

@@ -1,66 +1,44 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
 from datetime import datetime
+from typing import Optional, List
+from pydantic import BaseModel, Field
+from app.models.booking import BookingItemType, BookingStatus
 
 
-class BookingCreate(BaseModel):
-    """Schéma pour créer une réservation"""
-    type_reservation: str
-    ressource_id: str
-    nom_tour: Optional[str] = None
-    client_nom: str
-    client_email: str
-    client_telephone: str
-    date_arrivee: datetime
-    date_depart: Optional[datetime] = None
-    nombre_personnes: int
-    nombre_chambres: Optional[int] = None
-    notes_speciales: Optional[str] = None
-    preferences_repas: Optional[List[str]] = None
-    guide_requis: Optional[bool] = None
-    guide_id: Optional[str] = None
-    tarif_unitaire_fcfa: float
-    nombre_nuits_ou_jours: float = 1
-    montant_total_fcfa: float
-    reduction_pourcent: float = 0
-    montant_final_fcfa: float
-    methode_paiement: Optional[str] = None
-
-
-class BookingUpdate(BaseModel):
-    """Schéma pour mettre à jour une réservation"""
-    statut_reservation: Optional[str] = None
-    statut_paiement: Optional[str] = None
-    methode_paiement: Optional[str] = None
-    reference_paiement: Optional[str] = None
-    date_paiement: Optional[datetime] = None
-    guide_id: Optional[str] = None
-    notes_speciales: Optional[str] = None
-    date_annulation: Optional[datetime] = None
-    raison_annulation: Optional[str] = None
+class CreateBookingRequest(BaseModel):
+    item_type: BookingItemType
+    item_id: str
+    item_title: str
+    quantity: int = Field(default=1, gt=0)
+    unit_price: float = Field(..., ge=0)
+    currency: str = "XOF"
+    scheduled_date: Optional[datetime] = None
 
 
 class BookingResponse(BaseModel):
-    """Schéma de réponse pour une réservation"""
-    id: Optional[str] = None
-    type_reservation: str
-    ressource_id: str
-    nom_tour: Optional[str] = None
-    client_nom: str
-    client_email: str
-    client_telephone: str
-    date_arrivee: datetime
-    date_depart: Optional[datetime]
-    nombre_personnes: int
-    notes_speciales: Optional[str] = None
-    tarif_unitaire_fcfa: Optional[float] = None
-    nombre_nuits_ou_jours: Optional[float] = None
-    montant_total_fcfa: Optional[float] = None
-    reduction_pourcent: Optional[float] = None
-    montant_final_fcfa: float
-    statut_reservation: str
-    statut_paiement: str
-    date_creation: datetime
-    
-    class Config:
-        populate_by_name = True
+    id: str
+    booking_reference: str
+    customer_id: str
+    item_type: BookingItemType
+    item_id: str
+    item_title: str
+    quantity: int
+    unit_price: float
+    total_price: float
+    currency: str
+    scheduled_date: Optional[datetime] = None
+    status: BookingStatus
+    ticket_qr_code: str
+    cancellation_reason: Optional[str] = None
+    created_at: datetime
+
+
+class CancelBookingRequest(BaseModel):
+    reason: Optional[str] = None
+
+
+class InvoiceResponse(BaseModel):
+    id: str
+    booking_id: str
+    amount: float
+    currency: str
+    issued_at: datetime

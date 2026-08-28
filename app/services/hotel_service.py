@@ -1,141 +1,194 @@
-from typing import List, Optional
+from datetime import datetime, date
+from typing import Optional
 from bson import ObjectId
-from app.schemas.hotel import HotelCreate, HotelUpdate
+from fastapi import HTTPException, status
 from app.core.database import get_database
-import logging
+from app.models.hotel import AccommodationType, HotelStatus
+from app.schemas.hotel import (
+    CreateHotelRequest,
+    UpdateHotelRequest,
+    HotelSummary,
+    HotelDetail,
+    HotelListResponse,
+    AvailabilityCheckRequest,
+    AvailabilityCheckResponse,
+    RoomAvailability,
+)
 
-logger = logging.getLogger(__name__)
+COLLECTION = "hotels"
+BOOKINGS_COLLECTION = "hotel_room_bookings"  # alimentée par le futur module Réservation (§33)
 
 
-class HotelService:
-    """Service pour gérer les hôtels"""
-    
-    def __init__(self, db=None):
-        self.collection_name = "hotels"
-        db = db or get_database()
-        self.collection = db[self.collection_name]
+def _to_summary(doc: dict) -> HotelSummary:
+    prices = [rt["price_per_night"] for rt in doc.get("room_types", [])]
+    return HotelSummary(
+        id=str(doc["_id"]),
+        name=doc["name"],
+        type=doc["type"],
+        region=doc["region"],
+        city=doc.get("city"),
+        photo=doc["photos"][0] if doc.get("photos") else None,
+        min_price=min(prices) if prices else None,
+        currency=doc.get("room_types", [{}])[0].get("currency", "XOF") if doc.get("room_types") else "XOF",
+        average_rating=doc.get("average_rating", 0.0),
+        review_count=doc.get("review_count", 0),
+        is_verified=doc.get("is_verified", False),
+    )
 
-    def _to_response_dict(self, hotel: dict) -> dict:
-        """Normalise un document hôtel pour le schéma de réponse."""
-        if not hotel:
-            return hotel
 
-        if "_id" in hotel:
-            hotel["id"] = str(hotel["_id"])
+def _to_detail(doc: dict) -> HotelDetail:
+    return HotelDetail(
+        id=str(doc["_id"]),
+        owner_id=doc["owner_id"],
+        name=doc["name"],
+        type=doc["type"],
+        description=doc["description"],
+        region=doc["region"],
+        city=doc.get("city"),
+        location=doc["location"],
+        address=doc.get("address"),
+        photos=doc.get("photos", []),
+        amenities=doc.get("amenities", []),
+        room_types=doc.get("room_types", []),
+        offers=doc.get("offers", []),
+        contact_phone=doc.get("contact_phone"),
+        contact_email=doc.get("contact_email"),
+        average_rating=doc.get("average_rating", 0.0),
+        review_count=doc.get("review_count", 0),
+        is_verified=doc.get("is_verified", False),
+        data_source=doc.get("data_source", {}),
+        created_at=doc["created_at"],
+        updated_at=doc["updated_at"],
+    )
 
-        hotel.setdefault("types_chambres", [])
-        hotel.setdefault("services", [])
-        hotel.setdefault("equipements", [])
-        hotel.setdefault("galerie_images", [])
-        hotel.setdefault("note_moyenne", 0.0)
-        hotel.setdefault("nombre_evaluations", 0)
-        hotel.setdefault("publie", True)
-        return hotel
-    
-    async def create_hotel(self, hotel: HotelCreate, owner_id: Optional[str] = None) -> str:
-        """Créer un nouvel hôtel"""
-        try:
-            hotel_dict = hotel.model_dump()
-            hotel_dict["owner_id"] = owner_id
-            hotel_dict.setdefault("note_moyenne", 0.0)
-            hotel_dict.setdefault("nombre_evaluations", 0)
-            hotel_dict.setdefault("publie", True)
-            result = await self.collection.insert_one(hotel_dict)
-            logger.info(f"Hôtel créé: {result.inserted_id}")
-            return str(result.inserted_id)
-        except Exception as e:
-            logger.error(f"Erreur lors de la création d'un hôtel: {e}")
-            raise
-    
-    async def get_hotel(self, hotel_id: str) -> Optional[dict]:
-        """Récupérer un hôtel par ID"""
-        try:
-            hotel = await self.collection.find_one({"_id": ObjectId(hotel_id)})
-            return self._to_response_dict(hotel) if hotel else None
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération de l'hôtel: {e}")
-            raise
-    
-    async def get_all_hotels(self, skip: int = 0, limit: int = 10) -> List[dict]:
-        """Récupérer tous les hôtels"""
-        try:
-            hotels = []
-            async for hotel in self.collection.find({}).skip(skip).limit(limit):
-                hotels.append(self._to_response_dict(hotel))
-            return hotels
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des hôtels: {e}")
-            raise
-    
-    async def get_hotels_by_city(self, ville: str) -> List[dict]:
-        """Récupérer les hôtels par ville"""
-        try:
-            hotels = []
-            async for hotel in self.collection.find({"ville": ville}):
-                hotels.append(self._to_response_dict(hotel))
-            return hotels
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des hôtels par ville: {e}")
-            raise
-    
-    async def get_hotels_by_category(self, categorie: str) -> List[dict]:
-        """Récupérer les hôtels par catégorie"""
-        try:
-            hotels = []
-            async for hotel in self.collection.find({"categorie": categorie}):
-                hotels.append(self._to_response_dict(hotel))
-            return hotels
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des hôtels par catégorie: {e}")
-            raise
-    
-    async def get_hotels_by_price_range(self, min_price: float, max_price: float) -> List[dict]:
-        """Récupérer les hôtels par gamme de prix"""
-        try:
-            hotels = []
-            async for hotel in self.collection.find({
-                "tarif_nuit_min_fcfa": {"$gte": min_price},
-                "tarif_nuit_max_fcfa": {"$lte": max_price}
-            }):
-                hotels.append(self._to_response_dict(hotel))
-            return hotels
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des hôtels par prix: {e}")
-            raise
-    
-    async def update_hotel(self, hotel_id: str, hotel_update: HotelUpdate) -> bool:
-        """Mettre à jour un hôtel"""
-        try:
-            update_data = hotel_update.model_dump(exclude_unset=True)
-            if update_data:
-                result = await self.collection.update_one(
-                    {"_id": ObjectId(hotel_id)},
-                    {"$set": update_data}
-                )
-                logger.info(f"Hôtel mis à jour: {hotel_id}")
-                return result.modified_count > 0
-            return False
-        except Exception as e:
-            logger.error(f"Erreur lors de la mise à jour de l'hôtel: {e}")
-            raise
-    
-    async def delete_hotel(self, hotel_id: str) -> bool:
-        """Supprimer un hôtel"""
-        try:
-            result = await self.collection.delete_one({"_id": ObjectId(hotel_id)})
-            logger.info(f"Hôtel supprimé: {hotel_id}")
-            return result.deleted_count > 0
-        except Exception as e:
-            logger.error(f"Erreur lors de la suppression de l'hôtel: {e}")
-            raise
-    
-    async def get_top_rated_hotels(self, limit: int = 5) -> List[dict]:
-        """Récupérer les hôtels les mieux notés"""
-        try:
-            hotels = []
-            async for hotel in self.collection.find({"publie": True}).sort("note_moyenne", -1).limit(limit):
-                hotels.append(self._to_response_dict(hotel))
-            return hotels
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des meilleurs hôtels: {e}")
-            raise
+
+async def create_hotel(data: CreateHotelRequest, owner_id: str) -> HotelDetail:
+    db = get_database()
+    now = datetime.utcnow()
+    doc = data.model_dump()
+    doc["owner_id"] = owner_id
+    doc["offers"] = []
+    doc["average_rating"] = 0.0
+    doc["review_count"] = 0
+    doc["is_verified"] = False
+    doc["status"] = HotelStatus.PUBLISHED.value
+    doc["data_source"] = {"verified": False, "source": None, "last_updated_at": now}
+    doc["created_at"] = now
+    doc["updated_at"] = now
+
+    result = await db[COLLECTION].insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return _to_detail(doc)
+
+
+async def list_hotels(
+    type: Optional[AccommodationType] = None,
+    region: Optional[str] = None,
+    city: Optional[str] = None,
+    max_price: Optional[float] = None,
+    amenity: Optional[str] = None,
+    q: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> HotelListResponse:
+    db = get_database()
+    query: dict = {"status": HotelStatus.PUBLISHED.value}
+
+    if type:
+        query["type"] = type.value if isinstance(type, AccommodationType) else type
+    if region:
+        query["region"] = region
+    if city:
+        query["city"] = city
+    if amenity:
+        query["amenities"] = amenity
+    if max_price is not None:
+        query["room_types.price_per_night"] = {"$lte": max_price}
+    if q:
+        query["$or"] = [
+            {"name": {"$regex": q, "$options": "i"}},
+            {"description": {"$regex": q, "$options": "i"}},
+        ]
+
+    total = await db[COLLECTION].count_documents(query)
+    skip = (page - 1) * page_size
+    cursor = db[COLLECTION].find(query).skip(skip).limit(page_size)
+    docs = await cursor.to_list(length=page_size)
+
+    return HotelListResponse(
+        items=[_to_summary(d) for d in docs],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+
+async def get_hotel(hotel_id: str) -> HotelDetail:
+    db = get_database()
+    if not ObjectId.is_valid(hotel_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hébergement introuvable")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(hotel_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hébergement introuvable")
+    return _to_detail(doc)
+
+
+async def update_hotel(hotel_id: str, data: UpdateHotelRequest, current_user_id: str, is_admin: bool) -> HotelDetail:
+    db = get_database()
+    if not ObjectId.is_valid(hotel_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hébergement introuvable")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(hotel_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hébergement introuvable")
+    if doc["owner_id"] != current_user_id and not is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez modifier que vos propres hébergements")
+
+    update_fields = data.model_dump(exclude_unset=True, exclude_none=True)
+    if update_fields:
+        update_fields["updated_at"] = datetime.utcnow()
+        await db[COLLECTION].update_one({"_id": ObjectId(hotel_id)}, {"$set": update_fields})
+
+    return await get_hotel(hotel_id)
+
+
+async def delete_hotel(hotel_id: str, current_user_id: str, is_admin: bool) -> None:
+    db = get_database()
+    if not ObjectId.is_valid(hotel_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hébergement introuvable")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(hotel_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hébergement introuvable")
+    if doc["owner_id"] != current_user_id and not is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez supprimer que vos propres hébergements")
+    await db[COLLECTION].delete_one({"_id": ObjectId(hotel_id)})
+
+
+async def check_availability(hotel_id: str, data: AvailabilityCheckRequest) -> AvailabilityCheckResponse:
+    hotel = await get_hotel(hotel_id)
+    db = get_database()
+
+    check_in_str = data.check_in.isoformat()
+    check_out_str = data.check_out.isoformat()
+
+    room_types = hotel.room_types
+    if data.room_type_name:
+        room_types = [rt for rt in room_types if rt.name == data.room_type_name]
+
+    results = []
+    for rt in room_types:
+        overlapping = await db[BOOKINGS_COLLECTION].count_documents({
+            "hotel_id": hotel_id,
+            "room_type_name": rt.name,
+            "check_in": {"$lt": check_out_str},
+            "check_out": {"$gt": check_in_str},
+        })
+        results.append(RoomAvailability(
+            room_type_name=rt.name,
+            total_rooms=rt.total_rooms,
+            booked_rooms=overlapping,
+            available_rooms=max(0, rt.total_rooms - overlapping),
+            price_per_night=rt.price_per_night,
+            currency=rt.currency,
+        ))
+
+    return AvailabilityCheckResponse(check_in=data.check_in, check_out=data.check_out, rooms=results)

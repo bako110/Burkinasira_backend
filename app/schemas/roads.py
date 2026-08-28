@@ -1,36 +1,86 @@
-from pydantic import BaseModel
+from datetime import datetime
 from typing import Optional, List
+from pydantic import BaseModel, Field
+from app.models.destination import GeoPoint, DataSource, OpeningHours
+from app.models.roads import RoadServiceType, RoadServiceStatus, BreakdownReportStatus
 
 
-class RoadCreate(BaseModel):
-    """Schéma pour créer une condition de route"""
-    nom_route: str
-    point_depart_ville: str
-    point_arrivee_ville: str
-    etat_route: str = "bon"
-    type_route: str = "asphaltée"
-    distance_km: Optional[float] = None
+class CreateRoadServiceRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=150)
+    type: RoadServiceType
+    description: Optional[str] = None
+    region: str
+    city: Optional[str] = None
+    location: GeoPoint
+    address: Optional[str] = None
+    opening_hours: List[OpeningHours] = []
+    offers_24h: bool = False
+    contact_phone: Optional[str] = None
 
 
-class RoadUpdate(BaseModel):
-    """Schéma pour mettre à jour une condition de route"""
-    etat_route: Optional[str] = None
-    type_route: Optional[str] = None
-    distance_km: Optional[float] = None
+class UpdateRoadServiceRequest(BaseModel):
+    name: Optional[str] = None
+    type: Optional[RoadServiceType] = None
+    description: Optional[str] = None
+    region: Optional[str] = None
+    city: Optional[str] = None
+    location: Optional[GeoPoint] = None
+    address: Optional[str] = None
+    opening_hours: Optional[List[OpeningHours]] = None
+    offers_24h: Optional[bool] = None
+    contact_phone: Optional[str] = None
+    status: Optional[RoadServiceStatus] = None
 
 
-class RoadResponse(BaseModel):
-    """Schéma de réponse pour une condition de route"""
-    id: Optional[str] = None
-    nom_route: str
-    point_depart_ville: str
-    point_arrivee_ville: str
-    etat_route: str
-    type_route: str
-    distance_km: Optional[float]
-    temps_trajet_normal_heures: Optional[float]
-    zone_a_risque: bool
-    note_moyenne: float
-    
-    class Config:
-        populate_by_name = True
+class RoadServiceSummary(BaseModel):
+    id: str
+    name: str
+    type: RoadServiceType
+    region: str
+    city: Optional[str] = None
+    location: GeoPoint
+    offers_24h: bool
+    contact_phone: Optional[str] = None
+
+
+class RoadServiceDetail(BaseModel):
+    id: str
+    name: str
+    type: RoadServiceType
+    description: Optional[str] = None
+    region: str
+    city: Optional[str] = None
+    location: GeoPoint
+    address: Optional[str] = None
+    opening_hours: List[OpeningHours]
+    offers_24h: bool
+    contact_phone: Optional[str] = None
+    data_source: DataSource
+    created_at: datetime
+    updated_at: datetime
+
+
+class RoadServiceListResponse(BaseModel):
+    items: List[RoadServiceSummary]
+    total: int
+    page: int
+    page_size: int
+
+
+class ReportBreakdownRequest(BaseModel):
+    location: GeoPoint
+    description: Optional[str] = None
+
+
+class BreakdownReportResponse(BaseModel):
+    id: str
+    reporter_id: str
+    location: GeoPoint
+    description: Optional[str] = None
+    assigned_service_id: Optional[str] = None
+    status: BreakdownReportStatus
+    created_at: datetime
+
+
+class AssignBreakdownRequest(BaseModel):
+    service_id: str

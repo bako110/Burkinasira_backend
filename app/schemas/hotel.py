@@ -1,86 +1,103 @@
-from pydantic import BaseModel, EmailStr
+from datetime import datetime, date
 from typing import Optional, List
+from pydantic import BaseModel, Field
+from app.models.destination import GeoPoint, DataSource
+from app.models.hotel import AccommodationType, HotelStatus, RoomType, Offer
 
 
-class HotelCreate(BaseModel):
-    """Schéma pour créer un hôtel"""
-    nom: str
-    description: str
-    ville: str
+class CreateHotelRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=150)
+    type: AccommodationType
+    description: str = Field(..., min_length=10)
     region: str
-    adresse: str
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    categorie: str
-    nombre_etoiles: int
-    nombre_chambres: int
-    types_chambres: List[str] = []
-    tarif_nuit_min_fcfa: float
-    tarif_nuit_max_fcfa: float
-    petit_dejeuner_inclus: bool = False
-    services: List[str] = []
-    equipements: List[str] = []
-    telephone: Optional[str] = None
-    email: Optional[str] = None
-    website: Optional[str] = None
-    image: Optional[str] = None
-    images: List[str] = []
+    city: Optional[str] = None
+    location: GeoPoint
+    address: Optional[str] = None
+    photos: List[str] = []
+    amenities: List[str] = []
+    room_types: List[RoomType] = []
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
 
 
-class HotelUpdate(BaseModel):
-    """Schéma pour mettre à jour un hôtel"""
-    nom: Optional[str] = None
+class UpdateHotelRequest(BaseModel):
+    name: Optional[str] = None
+    type: Optional[AccommodationType] = None
     description: Optional[str] = None
-    ville: Optional[str] = None
     region: Optional[str] = None
-    adresse: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    categorie: Optional[str] = None
-    nombre_etoiles: Optional[int] = None
-    nombre_chambres: Optional[int] = None
-    types_chambres: Optional[List[str]] = None
-    tarif_nuit_min_fcfa: Optional[float] = None
-    tarif_nuit_max_fcfa: Optional[float] = None
-    petit_dejeuner_inclus: Optional[bool] = None
-    services: Optional[List[str]] = None
-    equipements: Optional[List[str]] = None
-    telephone: Optional[str] = None
-    email: Optional[str] = None
-    website: Optional[str] = None
-    image: Optional[str] = None
-    images: Optional[List[str]] = None
-    note_moyenne: Optional[float] = None
-    publie: Optional[bool] = None
+    city: Optional[str] = None
+    location: Optional[GeoPoint] = None
+    address: Optional[str] = None
+    photos: Optional[List[str]] = None
+    amenities: Optional[List[str]] = None
+    room_types: Optional[List[RoomType]] = None
+    offers: Optional[List[Offer]] = None
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
+    status: Optional[HotelStatus] = None
 
 
-class HotelResponse(BaseModel):
-    """Schéma de réponse pour un hôtel"""
-    id: Optional[str] = None
-    nom: str
-    description: str
-    ville: str
+class HotelSummary(BaseModel):
+    id: str
+    name: str
+    type: AccommodationType
     region: str
-    adresse: str
-    latitude: Optional[float]
-    longitude: Optional[float]
-    categorie: str
-    nombre_etoiles: int
-    nombre_chambres: int
-    types_chambres: List[str]
-    tarif_nuit_min_fcfa: float
-    tarif_nuit_max_fcfa: float
-    petit_dejeuner_inclus: bool
-    services: List[str]
-    equipements: List[str]
-    telephone: Optional[str]
-    email: Optional[str]
-    website: Optional[str]
-    image_principale: Optional[str]
-    galerie_images: List[str]
-    note_moyenne: float
-    nombre_evaluations: int
-    publie: bool
-    
-    class Config:
-        populate_by_name = True
+    city: Optional[str] = None
+    photo: Optional[str] = None
+    min_price: Optional[float] = None
+    currency: str = "XOF"
+    average_rating: float
+    review_count: int
+    is_verified: bool
+
+
+class HotelDetail(BaseModel):
+    id: str
+    owner_id: str
+    name: str
+    type: AccommodationType
+    description: str
+    region: str
+    city: Optional[str] = None
+    location: GeoPoint
+    address: Optional[str] = None
+    photos: List[str]
+    amenities: List[str]
+    room_types: List[RoomType]
+    offers: List[Offer]
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
+    average_rating: float
+    review_count: int
+    is_verified: bool
+    data_source: DataSource
+    created_at: datetime
+    updated_at: datetime
+
+
+class HotelListResponse(BaseModel):
+    items: List[HotelSummary]
+    total: int
+    page: int
+    page_size: int
+
+
+class AvailabilityCheckRequest(BaseModel):
+    check_in: date
+    check_out: date
+    room_type_name: Optional[str] = None
+
+
+class RoomAvailability(BaseModel):
+    room_type_name: str
+    total_rooms: int
+    booked_rooms: int
+    available_rooms: int
+    price_per_night: float
+    currency: str
+
+
+class AvailabilityCheckResponse(BaseModel):
+    check_in: date
+    check_out: date
+    rooms: List[RoomAvailability]

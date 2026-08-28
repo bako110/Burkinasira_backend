@@ -1,71 +1,158 @@
-from fastapi import APIRouter, HTTPException, Query
-from typing import List
-from app.schemas.artisan import ArtisanCreate, ArtisanUpdate, ArtisanResponse
-from app.services.artisan_service import ArtisanService
+from typing import Optional
+from fastapi import APIRouter, Depends, Query, status
+from app.core.security import get_current_user, get_current_user_optional, require_role
+from app.models.user import UserRole
+from app.models.artisan import ProductCategory
+from app.schemas.auth import TokenPayload
+from app.schemas.artisan import (
+    CreateArtisanRequest,
+    UpdateArtisanRequest,
+    ArtisanResponse,
+    CreateProductRequest,
+    UpdateProductRequest,
+    ProductDetail,
+    ProductListResponse,
+    CreateOrderRequest,
+    OrderResponse,
+)
+from app.services import artisan_service
 
-router = APIRouter(prefix="/artisans", tags=["Local Artisans"])
-artisan_service = ArtisanService()
-
-
-@router.post("/", response_model=dict, status_code=201)
-async def create_artisan(artisan: ArtisanCreate):
-    """Créer un profil artisan"""
-    artisan_id = await artisan_service.create_artisan(artisan)
-    return {"id": artisan_id, "message": "Artisan registered"}
-
-
-@router.get("/", response_model=List[ArtisanResponse])
-async def list_artisans(skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100)):
-    """Récupérer tous les artisans"""
-    return await artisan_service.get_all_artisans(skip, limit)
-
-
-@router.get("/craft/{type_metier}", response_model=List[ArtisanResponse])
-async def get_by_craft(type_metier: str):
-    """Récupérer les artisans par métier"""
-    return await artisan_service.get_artisans_by_craft(type_metier)
+router = APIRouter(prefix="/market", tags=["Artisanat et marketplace — GoTours Market"])
 
 
-@router.get("/city/{ville}", response_model=List[ArtisanResponse])
-async def get_by_city(ville: str):
-    """Récupérer les artisans d'une ville"""
-    return await artisan_service.get_artisans_by_city(ville)
+@router.get("/artisans", response_model=list)
+async def list_artisans(
+    region: Optional[str] = None,
+    verified_only: bool = False,
+    include_all_statuses: bool = False,
+    current_user: Optional[TokenPayload] = Depends(get_current_user_optional),
+):
+    """Artisans vérifiés (§19)."""
+    is_admin = current_user is not None and current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
+    return await artisan_service.list_artisans(
+        region=region, verified_only=verified_only,
+        include_all_statuses=include_all_statuses and is_admin,
+    )
 
 
-@router.get("/certified", response_model=List[ArtisanResponse])
-async def get_certified():
-    """Récupérer les artisans certifiés"""
-    return await artisan_service.get_certified_artisans()
+@router.get("/artisans/me", response_model=ArtisanResponse)
+async def get_my_artisan_profile(
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+):
+    """(Vendeur) Consulter son propre profil artisan."""
+    return await artisan_service.get_artisan_by_user_id(current_user.sub)
 
 
-@router.get("/top-rated", response_model=List[ArtisanResponse])
-async def get_top_rated():
-    """Récupérer les artisans les mieux notés"""
-    return await artisan_service.get_top_rated_artisans()
+@router.get("/artisans/{artisan_id}", response_model=ArtisanResponse)
+async def get_artisan(artisan_id: str):
+    """Profil public d'un artisan, avec histoire du fabricant."""
+    return await artisan_service.get_artisan(artisan_id)
 
 
-@router.get("/{artisan_id}", response_model=ArtisanResponse)
-async def get_one(artisan_id: str):
-    """Récupérer un artisan"""
-    artisan = await artisan_service.get_artisan(artisan_id)
-    if not artisan:
-        raise HTTPException(status_code=404, detail="Artisan not found")
-    return artisan
+@router.post("/artisans", response_model=ArtisanResponse, status_code=status.HTTP_201_CREATED)
+async def create_artisan(
+    data: CreateArtisanRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+):
+    """(Vendeur) Créer son profil artisan."""
+    return await artisan_service.create_artisan(data, user_id=current_user.sub)
 
 
-@router.put("/{artisan_id}")
-async def update_one(artisan_id: str, artisan: ArtisanUpdate):
-    """Mettre à jour un profil artisan"""
-    success = await artisan_service.update_artisan(artisan_id, artisan)
-    if not success:
-        raise HTTPException(status_code=404, detail="Artisan not found")
-    return {"message": "Artisan profile updated"}
+@router.patch("/artisans/me", response_model=ArtisanResponse)
+async def update_my_artisan_profile(
+    data: UpdateArtisanRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+):
+    """(Vendeur) Mettre à jour son profil artisan."""
+    return await artisan_service.update_artisan(current_user.sub, data)
 
 
-@router.delete("/{artisan_id}")
-async def delete_one(artisan_id: str):
-    """Supprimer un profil artisan"""
-    success = await artisan_service.delete_artisan(artisan_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Artisan not found")
-    return {"message": "Artisan profile deleted"}
+@router.delete("/artisans/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_my_artisan_profile(
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+):
+    """(Vendeur) Supprimer son propre profil artisan."""
+    await artisan_service.delete_artisan(current_user.sub)
+
+
+@router.delete("/artisans/{artisan_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_artisan(
+    artisan_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Supprimer le profil d'un artisan."""
+    await artisan_service.delete_artisan(current_user.sub, is_admin=True, target_artisan_id=artisan_id)
+
+
+@router.post("/artisans/{artisan_id}/verify", response_model=ArtisanResponse)
+async def verify_artisan(
+    artisan_id: str,
+    is_verified: bool = True,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Vérifier un artisan (§37)."""
+    return await artisan_service.set_verification_status(artisan_id, is_verified)
+
+
+@router.get("/products", response_model=ProductListResponse)
+async def list_products(
+    category: Optional[ProductCategory] = None,
+    artisan_id: Optional[str] = None,
+    q: Optional[str] = Query(default=None, description="Recherche texte (nom, description)"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+):
+    """Rechercher / filtrer un produit (§19)."""
+    return await artisan_service.list_products(category=category, artisan_id=artisan_id, q=q, page=page, page_size=page_size)
+
+
+@router.get("/products/{product_id}", response_model=ProductDetail)
+async def get_product(product_id: str):
+    """Détail d'un produit."""
+    return await artisan_service.get_product(product_id)
+
+
+@router.post("/products", response_model=ProductDetail, status_code=status.HTTP_201_CREATED)
+async def create_product(
+    data: CreateProductRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+):
+    """(Vendeur) Ajouter un produit à son catalogue."""
+    artisan = await artisan_service.get_artisan_by_user_id(current_user.sub)
+    return await artisan_service.create_product(data, artisan_id=artisan.id)
+
+
+@router.patch("/products/{product_id}", response_model=ProductDetail)
+async def update_product(
+    product_id: str,
+    data: UpdateProductRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+):
+    """(Vendeur) Mettre à jour un produit, gérer les stocks."""
+    artisan = await artisan_service.get_artisan_by_user_id(current_user.sub)
+    return await artisan_service.update_product(product_id, data, artisan.id)
+
+
+@router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_product(
+    product_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+):
+    """(Vendeur) Supprimer un produit."""
+    artisan = await artisan_service.get_artisan_by_user_id(current_user.sub)
+    await artisan_service.delete_product(product_id, artisan.id)
+
+
+@router.post("/orders", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
+async def create_order(
+    data: CreateOrderRequest,
+    current_user: TokenPayload = Depends(get_current_user),
+):
+    """Commander un produit (livraison ou retrait)."""
+    return await artisan_service.create_order(data, buyer_id=current_user.sub)
+
+
+@router.get("/orders/me", response_model=list)
+async def list_my_orders(current_user: TokenPayload = Depends(get_current_user)):
+    """Historique de ses commandes."""
+    return await artisan_service.list_my_orders(current_user.sub)

@@ -1,110 +1,91 @@
-from fastapi import APIRouter, HTTPException, Query
-from typing import List
-from app.schemas.tourist_info import TouristInfoCreate, TouristInfoUpdate, TouristInfoResponse
-from app.services.tourist_info_service import TouristInfoService
+from typing import Optional
+from fastapi import APIRouter, Depends, status
+from app.core.security import require_role
+from app.models.user import UserRole
+from app.models.tourist_info import TravelInfoCategory
+from app.schemas.auth import TokenPayload
+from app.schemas.tourist_info import (
+    CreateTravelInfoRequest,
+    UpdateTravelInfoRequest,
+    TravelInfoResponse,
+    CreateDiplomaticContactRequest,
+    UpdateDiplomaticContactRequest,
+    DiplomaticContactResponse,
+)
+from app.services import tourist_info_service
 
-router = APIRouter(prefix="/tourist-info", tags=["Tourist Information"])
-info_service = TouristInfoService()
-
-
-@router.post("/", response_model=dict, status_code=201)
-async def create_info(info: TouristInfoCreate):
-    """Créer une information touristique"""
-    info_id = await info_service.create_info(info)
-    return {"id": info_id, "message": "Tourist information created"}
-
-
-@router.get("/", response_model=List[TouristInfoResponse])
-async def list_infos(skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100)):
-    """Récupérer toutes les infos"""
-    return await info_service.get_all_infos(skip, limit)
+router = APIRouter(prefix="/tourist-info", tags=["Administrations et formalités du voyage"])
 
 
-@router.get("/category/{categorie}", response_model=List[TouristInfoResponse])
-async def get_by_category(categorie: str):
-    """Récupérer les infos par catégorie"""
-    return await info_service.get_info_by_category(categorie)
+@router.get("/travel-info", response_model=list)
+async def list_travel_info(category: Optional[TravelInfoCategory] = None):
+    """Passeport/visa, formalités entrée-sortie, douanes, permis touristiques (§15)."""
+    return await tourist_info_service.list_travel_info(category)
 
 
-@router.get("/visa", response_model=TouristInfoResponse)
-async def get_visa():
-    """Récupérer les conditions de visa"""
-    result = await info_service.get_visa_requirements()
-    if not result:
-        raise HTTPException(status_code=404, detail="Visa info not found")
-    return result
+@router.get("/travel-info/{info_id}", response_model=TravelInfoResponse)
+async def get_travel_info(info_id: str):
+    """Détail d'une information administrative."""
+    return await tourist_info_service.get_travel_info(info_id)
 
 
-@router.get("/culture/customs", response_model=List[TouristInfoResponse])
-async def get_customs():
-    """Récupérer les coutumes culturelles"""
-    return await info_service.get_cultural_customs()
+@router.post("/travel-info", response_model=TravelInfoResponse, status_code=status.HTTP_201_CREATED)
+async def create_travel_info(
+    data: CreateTravelInfoRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Publier une information administrative officielle."""
+    return await tourist_info_service.create_travel_info(data)
 
 
-@router.get("/climate", response_model=TouristInfoResponse)
-async def get_climate(region: str = Query(None)):
-    """Récupérer les infos sur le climat"""
-    result = await info_service.get_climate_info(region)
-    if not result:
-        raise HTTPException(status_code=404, detail="Climate info not found")
-    return result
+@router.patch("/travel-info/{info_id}", response_model=TravelInfoResponse)
+async def update_travel_info(
+    info_id: str,
+    data: UpdateTravelInfoRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Mettre à jour une information administrative."""
+    return await tourist_info_service.update_travel_info(info_id, data)
 
 
-@router.get("/packing-guide", response_model=TouristInfoResponse)
-async def get_packing(season: str = Query("toutes")):
-    """Récupérer le guide de packing"""
-    result = await info_service.get_packing_guide(season)
-    if not result:
-        raise HTTPException(status_code=404, detail="Packing guide not found")
-    return result
+@router.delete("/travel-info/{info_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_travel_info(
+    info_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Supprimer une information administrative."""
+    await tourist_info_service.delete_travel_info(info_id)
 
 
-@router.get("/currency", response_model=TouristInfoResponse)
-async def get_currency():
-    """Récupérer les infos de change"""
-    result = await info_service.get_currency_exchange_info()
-    if not result:
-        raise HTTPException(status_code=404, detail="Currency info not found")
-    return result
+@router.get("/diplomatic-contacts", response_model=list)
+async def list_diplomatic_contacts(country: Optional[str] = None):
+    """Contacts des représentations diplomatiques et consulaires (§15)."""
+    return await tourist_info_service.list_diplomatic_contacts(country)
 
 
-@router.get("/languages", response_model=TouristInfoResponse)
-async def get_languages():
-    """Récupérer les infos sur les langues"""
-    result = await info_service.get_languages_info()
-    if not result:
-        raise HTTPException(status_code=404, detail="Languages info not found")
-    return result
+@router.post("/diplomatic-contacts", response_model=DiplomaticContactResponse, status_code=status.HTTP_201_CREATED)
+async def create_diplomatic_contact(
+    data: CreateDiplomaticContactRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Ajouter un contact diplomatique."""
+    return await tourist_info_service.create_diplomatic_contact(data)
 
 
-@router.get("/search", response_model=List[TouristInfoResponse])
-async def search(keyword: str = Query(..., min_length=2)):
-    """Rechercher des conseils utiles"""
-    return await info_service.search_useful_tips(keyword)
+@router.patch("/diplomatic-contacts/{contact_id}", response_model=DiplomaticContactResponse)
+async def update_diplomatic_contact(
+    contact_id: str,
+    data: UpdateDiplomaticContactRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Mettre à jour un contact diplomatique."""
+    return await tourist_info_service.update_diplomatic_contact(contact_id, data)
 
 
-@router.get("/{info_id}", response_model=TouristInfoResponse)
-async def get_one(info_id: str):
-    """Récupérer une information"""
-    info = await info_service.get_info(info_id)
-    if not info:
-        raise HTTPException(status_code=404, detail="Information not found")
-    return info
-
-
-@router.put("/{info_id}")
-async def update_one(info_id: str, info: TouristInfoUpdate):
-    """Mettre à jour une information"""
-    success = await info_service.update_info(info_id, info)
-    if not success:
-        raise HTTPException(status_code=404, detail="Information not found")
-    return {"message": "Information updated"}
-
-
-@router.delete("/{info_id}")
-async def delete_one(info_id: str):
-    """Supprimer une information"""
-    success = await info_service.delete_info(info_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Information not found")
-    return {"message": "Information deleted"}
+@router.delete("/diplomatic-contacts/{contact_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_diplomatic_contact(
+    contact_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Supprimer un contact diplomatique."""
+    await tourist_info_service.delete_diplomatic_contact(contact_id)

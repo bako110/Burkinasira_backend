@@ -1,84 +1,86 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import List
-from app.schemas.health import HealthCreate, HealthUpdate, HealthResponse
-from app.services.health_service import HealthService
+from typing import Optional
+from fastapi import APIRouter, Depends, Query, status
+from app.core.security import get_current_user, require_role
+from app.models.user import UserRole
+from app.models.health import HealthFacilityType
+from app.schemas.auth import TokenPayload
+from app.schemas.health import (
+    CreateHealthFacilityRequest,
+    UpdateHealthFacilityRequest,
+    HealthFacilityDetail,
+    HealthFacilityListResponse,
+)
+from app.services import health_service
 
-router = APIRouter(prefix="/health-facilities", tags=["Health Facilities"])
-health_service = HealthService()
-
-
-@router.post("/", response_model=dict, status_code=201)
-async def create_facility(facility: HealthCreate):
-    """Créer une structure sanitaire"""
-    facility_id = await health_service.create_facility(facility)
-    return {"id": facility_id, "message": "Facility created successfully"}
-
-
-@router.get("/", response_model=List[HealthResponse])
-async def list_facilities(skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100)):
-    """Récupérer toutes les structures sanitaires"""
-    return await health_service.get_all_facilities(skip, limit)
+router = APIRouter(prefix="/health-facilities", tags=["Santé"])
 
 
-@router.get("/pharmacies", response_model=List[HealthResponse])
-async def get_pharmacies():
-    """Récupérer toutes les pharmacies"""
-    return await health_service.get_pharmacies()
-
-
-@router.get("/emergency", response_model=List[HealthResponse])
-async def get_emergency_facilities():
-    """Récupérer les structures avec urgences 24h"""
-    return await health_service.get_emergency_facilities()
-
-
-@router.get("/city/{ville}", response_model=List[HealthResponse])
-async def get_by_city(ville: str):
-    """Récupérer les structures d'une ville"""
-    return await health_service.get_facilities_by_city(ville)
-
-
-@router.get("/near", response_model=List[HealthResponse])
-async def get_near_location(
-    latitude: float = Query(...),
-    longitude: float = Query(...),
-    radius_km: float = Query(5, ge=1, le=50)
+@router.get("", response_model=HealthFacilityListResponse)
+async def list_health_facilities(
+    type: Optional[HealthFacilityType] = None,
+    region: Optional[str] = None,
+    on_duty_only: bool = Query(default=False, description="Pharmacies de garde uniquement"),
+    near_lat: Optional[float] = None,
+    near_lng: Optional[float] = None,
+    radius_km: Optional[float] = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
 ):
-    """Trouver les structures proches d'une localisation"""
-    return await health_service.get_facilities_near_location(latitude, longitude, radius_km)
+    """Pharmacies, hôpitaux, cliniques, laboratoires... par distance/horaires/services (§9)."""
+    return await health_service.list_health_facilities(
+        type=type, region=region, on_duty_only=on_duty_only,
+        near_lat=near_lat, near_lng=near_lng, radius_km=radius_km,
+        page=page, page_size=page_size,
+    )
 
 
-@router.get("/{facility_id}", response_model=HealthResponse)
-async def get_facility(facility_id: str):
-    """Récupérer une structure sanitaire"""
-    facility = await health_service.get_facility(facility_id)
-    if not facility:
-        raise HTTPException(status_code=404, detail="Facility not found")
-    return facility
+@router.get("/favorites", response_model=list)
+async def list_my_favorites(current_user: TokenPayload = Depends(get_current_user)):
+    """Établissements de santé enregistrés en favori."""
+    return await health_service.list_favorites(current_user.sub)
 
 
-@router.put("/{facility_id}")
-async def update_facility(facility_id: str, facility: HealthUpdate):
-    """Mettre à jour une structure"""
-    success = await health_service.update_facility(facility_id, facility)
-    if not success:
-        raise HTTPException(status_code=404, detail="Facility not found")
-    return {"message": "Facility updated successfully"}
+@router.get("/{facility_id}", response_model=HealthFacilityDetail)
+async def get_health_facility(facility_id: str):
+    """Fiche détaillée : horaires, services, date/source de mise à jour."""
+    return await health_service.get_health_facility(facility_id)
 
 
-@router.post("/{facility_id}/verify")
-async def verify_facility(facility_id: str):
-    """Vérifier une structure (ADMIN)"""
-    success = await health_service.verify_facility(facility_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Facility not found")
-    return {"message": "Facility verified"}
+@router.post("/{facility_id}/favorite", status_code=status.HTTP_204_NO_CONTENT)
+async def add_favorite(facility_id: str, current_user: TokenPayload = Depends(get_current_user)):
+    """Enregistrer un établissement en favori."""
+    await health_service.add_favorite(current_user.sub, facility_id)
 
 
-@router.delete("/{facility_id}")
-async def delete_facility(facility_id: str):
-    """Supprimer une structure"""
-    success = await health_service.delete_facility(facility_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Facility not found")
-    return {"message": "Facility deleted"}
+@router.delete("/{facility_id}/favorite", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_favorite(facility_id: str, current_user: TokenPayload = Depends(get_current_user)):
+    """Retirer un établissement des favoris."""
+    await health_service.remove_favorite(current_user.sub, facility_id)
+
+
+@router.post("", response_model=HealthFacilityDetail, status_code=status.HTTP_201_CREATED)
+async def create_health_facility(
+    data: CreateHealthFacilityRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
+):
+    """(Admin) Ajouter un établissement de santé."""
+    return await health_service.create_health_facility(data, created_by=current_user.sub)
+
+
+@router.patch("/{facility_id}", response_model=HealthFacilityDetail)
+async def update_health_facility(
+    facility_id: str,
+    data: UpdateHealthFacilityRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
+):
+    """(Admin) Mettre à jour un établissement (horaires, statut garde, etc.)."""
+    return await health_service.update_health_facility(facility_id, data)
+
+
+@router.delete("/{facility_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_health_facility(
+    facility_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Supprimer un établissement de santé."""
+    await health_service.delete_health_facility(facility_id)

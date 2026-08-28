@@ -1,281 +1,178 @@
-from typing import List, Optional
-from bson import ObjectId
-from app.schemas.guide import GuideCreate, GuideUpdate, GuideProfileCreate
-from app.core.database import get_database
 from datetime import datetime
-import logging
+from typing import Optional
+from bson import ObjectId
+from fastapi import HTTPException, status
+from app.core.database import get_database
+from app.models.guide import GuideStatus
+from app.schemas.guide import (
+    CreateGuideProfileRequest,
+    UpdateGuideProfileRequest,
+    GuideSummary,
+    GuideDetail,
+    GuideListResponse,
+)
 
-logger = logging.getLogger(__name__)
+COLLECTION = "guide_profiles"
 
 
-class GuideService:
-    """Service pour gérer les guides touristiques"""
-    
-    def __init__(self, db=None):
-        self.db = db
-        self.collection_name = "guides"
-    
-    def _get_db(self):
-        if self.db is not None:
-            return self.db
-        return get_database()
-    
-    def _format_guide(self, guide: dict) -> dict:
-        """Convertir un document MongoDB en dict pour le frontend - convertir tous les ObjectId en strings"""
-        if guide:
-            # Convertir _id à un string
-            guide["_id"] = str(guide["_id"])
-            guide["id"] = guide["_id"]
-            
-            # Convertir user_id si présent
-            if "user_id" in guide and guide["user_id"] and not isinstance(guide["user_id"], str):
-                guide["user_id"] = str(guide["user_id"])
-            
-            # Mapper les champs pour le frontend
-            guide["nom_complet"] = f"{guide.get('nom', '')} {guide.get('prenom', '')}".strip()
-            guide["bio"] = guide.get("biographie")
-            guide["langues_parlees"] = guide.get("langues", [])
-            guide["regions_couvertes"] = guide.get("destinations_principales", [])
-            guide["tarif_journee"] = guide.get("tarif_journee_fcfa")
-            guide["experience_annees"] = guide.get("annees_experience")
-            
-            # Normaliser les images: photo (ancien) → image (nouveau)
-            image = guide.get("image") or guide.get("photo")
-            if image:
-                if isinstance(image, str):
-                    guide["image"] = image
-                elif isinstance(image, dict) and "url" in image:
-                    guide["image"] = image["url"]
-                else:
-                    guide["image"] = str(image) if image else None
-            else:
-                guide["image"] = None
-            
-            # Pour backward compatibility avec l'ancien champ
-            guide["photo_profil"] = guide.get("image")
-                
-            guide["certifications"] = guide.get("certifications", [])
-            guide["tours_proposes"] = guide.get("tours_proposes", [])
-        
-        return guide
-    
-    async def create_guide_profile(self, profile: GuideProfileCreate, user_id: str) -> str:
-        """Créer un profil guide depuis l'application mobile"""
-        try:
-            db = self._get_db()
-            
-            # Séparer le nom complet en nom et prénom
-            nom_parts = profile.nom_complet.strip().split(maxsplit=1)
-            nom = nom_parts[0] if len(nom_parts) > 0 else ""
-            prenom = nom_parts[1] if len(nom_parts) > 1 else ""
-            
-            # Récupérer l'utilisateur pour obtenir son email
-            user = await db["users"].find_one({"_id": ObjectId(user_id)})
-            if not user:
-                raise ValueError("Utilisateur non trouvé")
-            
-            # Construire le document guide
-            guide_dict = {
-                "user_id": user_id,
-                "nom": nom,
-                "prenom": prenom,
-                "telephone": profile.telephone,
-                "email": user.get("email"),
-                "photo": profile.photo,
-                "ville": "",  # À compléter plus tard
-                "region": profile.regions_couvertes[0] if profile.regions_couvertes else "",
-                "langues": profile.langues_parlees,
-                "specialites": profile.specialites,
-                "licence_guide": True,
-                "articles_guides": None,
-                "annees_experience": profile.experience_annees,
-                "destinations_principales": profile.regions_couvertes,
-                "tarif_journee_fcfa": profile.tarif_journee,
-                "tarif_demi_journee_fcfa": profile.tarif_journee / 2,
-                "biographie": profile.bio,
-                "possede_vehicule": profile.possede_vehicule,
-                "type_vehicule": profile.type_vehicule,
-                "disponible": profile.disponible,
-                "jours_disponibilite": ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"],
-                "note_moyenne": 0,
-                "nombre_avis": 0,
-                "nombre_clients_satisfaits": 0,
-                "activites_animees": [],
-                "destinations_reconnues": [],
-                "tours_proposes": getattr(profile, "tours_proposes", []),
-                "actif": True,
-                "verified": False,
-                "date_inscription": datetime.utcnow(),
-                "date_modification": datetime.utcnow()
-            }
-            
-            existing_guide = await db[self.collection_name].find_one({"user_id": user_id})
+def _to_summary(doc: dict) -> GuideSummary:
+    return GuideSummary(
+        id=str(doc["_id"]),
+        display_name=doc["display_name"],
+        photo_url=doc.get("photo_url"),
+        languages=doc.get("languages", []),
+        specialties=doc.get("specialties", []),
+        regions_covered=doc.get("regions_covered", []),
+        is_verified=doc.get("is_verified", False),
+        average_rating=doc.get("average_rating", 0.0),
+        review_count=doc.get("review_count", 0),
+        daily_rate=doc.get("daily_rate"),
+        currency=doc.get("currency", "XOF"),
+    )
 
-            if existing_guide:
-                guide_dict["date_inscription"] = existing_guide.get("date_inscription", datetime.utcnow())
-                result = await db[self.collection_name].update_one(
-                    {"_id": existing_guide["_id"]},
-                    {"$set": guide_dict}
-                )
-                logger.info(f"Profil guide mis à jour via create profile: {existing_guide['_id']}, modifié: {result.modified_count > 0}")
-                return str(existing_guide["_id"])
 
-            result = await db[self.collection_name].insert_one(guide_dict)
-            logger.info(f"Profil guide créé: {result.inserted_id}")
-            return str(result.inserted_id)
-        except Exception as e:
-            logger.error(f"Erreur lors de la création du profil guide: {e}", exc_info=True)
-            raise
-    
-    async def create_guide(self, guide: GuideCreate) -> str:
-        """Créer un nouveau guide"""
-        try:
-            db = self._get_db()
-            guide_dict = guide.model_dump()
-            result = await db[self.collection_name].insert_one(guide_dict)
-            logger.info(f"Guide créé: {result.inserted_id}")
-            return str(result.inserted_id)
-        except Exception as e:
-            logger.error(f"Erreur lors de la création d'un guide: {e}")
-            raise
-    
-    async def get_guide(self, guide_id: str) -> Optional[dict]:
-        """Récupérer un guide par ID"""
-        try:
-            db = self._get_db()
-            guide = await db[self.collection_name].find_one({"_id": ObjectId(guide_id)})
-            return self._format_guide(guide) if guide else None
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération du guide: {e}")
-            raise
-    
-    async def get_guide_by_user_id(self, user_id: str) -> Optional[dict]:
-        """Récupérer un guide par user_id"""
-        try:
-            db = self._get_db()
-            guide = await db[self.collection_name].find_one({"user_id": user_id})
-            if guide:
-                guide = self._format_guide(guide)
-                logger.info(f"Guide récupéré pour user_id {user_id}: {guide.get('nom_complet')}")
-            return guide
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération du guide par user_id: {e}")
-            raise
-    
-    async def get_all_guides(self, skip: int = 0, limit: int = 10) -> List[dict]:
-        """Récupérer tous les guides"""
-        try:
-            db = self._get_db()
-            guides = []
-            async for guide in db[self.collection_name].find({"actif": True}).skip(skip).limit(limit):
-                guides.append(self._format_guide(guide))
-            return guides
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des guides: {e}")
-            raise
-    
-    async def get_guides_by_city(self, ville: str) -> List[dict]:
-        """Récupérer les guides par ville"""
-        try:
-            db = self._get_db()
-            guides = []
-            async for guide in db[self.collection_name].find({"ville": ville, "actif": True}):
-                guides.append(self._format_guide(guide))
-            return guides
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des guides par ville: {e}")
-            raise
-    
-    async def get_guides_by_language(self, langue: str) -> List[dict]:
-        """Récupérer les guides parlant une langue"""
-        try:
-            db = self._get_db()
-            guides = []
-            async for guide in db[self.collection_name].find({
-                "langues": langue,
-                "actif": True
-            }):
-                guides.append(self._format_guide(guide))
-            return guides
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des guides par langue: {e}")
-            raise
-    
-    async def get_guides_by_specialty(self, specialite: str) -> List[dict]:
-        """Récupérer les guides par spécialité"""
-        try:
-            db = get_database()
-            guides = []
-            async for guide in db[self.collection_name].find({
-                "specialites": specialite,
-                "actif": True
-            }):
-                guide["id"] = str(guide["_id"])
-                guides.append(guide)
-            return guides
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des guides par spécialité: {e}")
-            raise
-    
-    async def get_guides_with_vehicle(self) -> List[dict]:
-        """Récupérer les guides disposant d'un véhicule"""
-        try:
-            db = get_database()
-            guides = []
-            async for guide in db[self.collection_name].find({
-                "possede_vehicule": True,
-                "actif": True
-            }):
-                guide["id"] = str(guide["_id"])
-                guides.append(guide)
-            return guides
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des guides avec véhicule: {e}")
-            raise
-    
-    async def update_guide(self, guide_id: str, guide_update: GuideUpdate) -> bool:
-        """Mettre à jour un guide"""
-        try:
-            db = self._get_db()
-            # Convertir le modèle en dict en utilisant les noms de champs (pas les alias)
-            update_data = guide_update.model_dump(exclude_unset=True, by_alias=False)
-            update_data["date_modification"] = datetime.utcnow()
-            
-            logger.info(f"Mise à jour guide {guide_id} avec: {update_data}")
-            
-            if update_data:
-                result = await db[self.collection_name].update_one(
-                    {"_id": ObjectId(guide_id)},
-                    {"$set": update_data}
-                )
-                logger.info(
-                    f"Guide mis à jour: {guide_id}, trouvé: {result.matched_count > 0}, modifié: {result.modified_count > 0}"
-                )
-                return result.matched_count > 0
-            return False
-        except Exception as e:
-            logger.error(f"Erreur lors de la mise à jour du guide: {e}")
-            raise
-    
-    async def delete_guide(self, guide_id: str) -> bool:
-        """Supprimer un guide"""
-        try:
-            db = self._get_db()
-            result = await db[self.collection_name].delete_one({"_id": ObjectId(guide_id)})
-            logger.info(f"Guide supprimé: {guide_id}")
-            return result.deleted_count > 0
-        except Exception as e:
-            logger.error(f"Erreur lors de la suppression du guide: {e}")
-            raise
-    
-    async def get_top_rated_guides(self, limit: int = 5) -> List[dict]:
-        """Récupérer les guides les mieux notés"""
-        try:
-            db = self._get_db()
-            guides = []
-            async for guide in db[self.collection_name].find({"actif": True, "verified": True}).sort("note_moyenne", -1).limit(limit):
-                guides.append(self._format_guide(guide))
-            return guides
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des meilleurs guides: {e}")
-            raise
+def _to_detail(doc: dict) -> GuideDetail:
+    return GuideDetail(
+        id=str(doc["_id"]),
+        user_id=doc["user_id"],
+        display_name=doc["display_name"],
+        bio=doc.get("bio"),
+        photo_url=doc.get("photo_url"),
+        languages=doc.get("languages", []),
+        specialties=doc.get("specialties", []),
+        regions_covered=doc.get("regions_covered", []),
+        certifications=doc.get("certifications", []),
+        hourly_rate=doc.get("hourly_rate"),
+        daily_rate=doc.get("daily_rate"),
+        currency=doc.get("currency", "XOF"),
+        is_verified=doc.get("is_verified", False),
+        status=doc.get("status", GuideStatus.PENDING.value),
+        average_rating=doc.get("average_rating", 0.0),
+        review_count=doc.get("review_count", 0),
+        visits_completed=doc.get("visits_completed", 0),
+        created_at=doc["created_at"],
+        updated_at=doc["updated_at"],
+    )
+
+
+async def create_guide_profile(data: CreateGuideProfileRequest, user_id: str) -> GuideDetail:
+    db = get_database()
+    existing = await db[COLLECTION].find_one({"user_id": user_id})
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Un profil guide existe déjà pour ce compte",
+        )
+
+    now = datetime.utcnow()
+    doc = data.model_dump()
+    doc["user_id"] = user_id
+    doc["is_verified"] = False
+    doc["status"] = GuideStatus.PENDING.value
+    doc["average_rating"] = 0.0
+    doc["review_count"] = 0
+    doc["visits_completed"] = 0
+    doc["created_at"] = now
+    doc["updated_at"] = now
+
+    result = await db[COLLECTION].insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return _to_detail(doc)
+
+
+async def list_guides(
+    region: Optional[str] = None,
+    language: Optional[str] = None,
+    specialty: Optional[str] = None,
+    verified_only: bool = False,
+    include_all_statuses: bool = False,
+    page: int = 1,
+    page_size: int = 20,
+) -> GuideListResponse:
+    db = get_database()
+    query: dict = {} if include_all_statuses else {"status": GuideStatus.ACTIVE.value}
+
+    if region:
+        query["regions_covered"] = region
+    if language:
+        query["languages"] = language
+    if specialty:
+        query["specialties"] = specialty
+    if verified_only:
+        query["is_verified"] = True
+
+    total = await db[COLLECTION].count_documents(query)
+    skip = (page - 1) * page_size
+    cursor = db[COLLECTION].find(query).skip(skip).limit(page_size)
+    docs = await cursor.to_list(length=page_size)
+
+    return GuideListResponse(
+        items=[_to_summary(d) for d in docs],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+
+async def get_guide(guide_id: str) -> GuideDetail:
+    db = get_database()
+    if not ObjectId.is_valid(guide_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guide introuvable")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(guide_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guide introuvable")
+    return _to_detail(doc)
+
+
+async def get_guide_by_user_id(user_id: str) -> GuideDetail:
+    db = get_database()
+    doc = await db[COLLECTION].find_one({"user_id": user_id})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profil guide introuvable")
+    return _to_detail(doc)
+
+
+async def update_guide_profile(user_id: str, data: UpdateGuideProfileRequest) -> GuideDetail:
+    db = get_database()
+    doc = await db[COLLECTION].find_one({"user_id": user_id})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profil guide introuvable")
+
+    update_fields = data.model_dump(exclude_unset=True, exclude_none=True)
+    if update_fields:
+        update_fields["updated_at"] = datetime.utcnow()
+        await db[COLLECTION].update_one({"_id": doc["_id"]}, {"$set": update_fields})
+
+    return await get_guide(str(doc["_id"]))
+
+
+async def set_verification_status(guide_id: str, is_verified: bool) -> GuideDetail:
+    """(Admin) Vérifier ou retirer la vérification d'un guide (§37 GoTours Verified)."""
+    db = get_database()
+    if not ObjectId.is_valid(guide_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guide introuvable")
+    result = await db[COLLECTION].update_one(
+        {"_id": ObjectId(guide_id)},
+        {"$set": {"is_verified": is_verified, "status": GuideStatus.ACTIVE.value, "updated_at": datetime.utcnow()}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guide introuvable")
+    return await get_guide(guide_id)
+
+
+async def delete_guide_profile(user_id: str, is_admin: bool = False, target_guide_id: Optional[str] = None) -> None:
+    db = get_database()
+    if target_guide_id:
+        if not ObjectId.is_valid(target_guide_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profil guide introuvable")
+        doc = await db[COLLECTION].find_one({"_id": ObjectId(target_guide_id)})
+        if not doc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profil guide introuvable")
+        if doc["user_id"] != user_id and not is_admin:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez supprimer que votre propre profil")
+        await db[COLLECTION].delete_one({"_id": ObjectId(target_guide_id)})
+        return
+
+    result = await db[COLLECTION].delete_one({"user_id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profil guide introuvable")

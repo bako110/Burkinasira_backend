@@ -1,65 +1,46 @@
-from pydantic import BaseModel, Field, EmailStr
-from typing import Optional, List
-from datetime import datetime
 from enum import Enum
+from datetime import datetime
+from typing import Optional
+from pydantic import BaseModel, Field, EmailStr
 
 
 class UserRole(str, Enum):
-    """Rôles utilisateur disponibles"""
-    ADMIN = "admin"  # Accès complet, gestion du système, validation providers
-    TOURIST = "tourist"  # Visite sites, réserve, publie avis/histoires
-    GUIDE = "guide"  # Profil guide touristique
-    PROVIDER = "provider"  # Artisan ou Restaurant (prestataires)
-    MODERATOR = "moderator"  # Modération contenu sensible
+    TOURIST = "tourist"
+    GUIDE = "guide"
+    PROVIDER = "provider"
+    MODERATOR = "moderator"
+    ADMIN = "admin"
+
+
+class UserStatus(str, Enum):
+    ACTIVE = "active"
+    SUSPENDED = "suspended"
+    DELETED = "deleted"
 
 
 class User(BaseModel):
-    """Modèle utilisateur MongoDB"""
-    id: Optional[str] = Field(None, alias="_id")
+    id: Optional[str] = Field(default=None, alias="_id")
+    full_name: str
     email: EmailStr
-    telephone: Optional[str] = None  # Numéro de téléphone pour connexion alternative
-    nom_complet: str
-    motdepasse_hash: str  # Jamais stocker en clair!
+    phone: Optional[str] = None
+    hashed_password: str
     role: UserRole = UserRole.TOURIST
-    actif: bool = True
-    verifiee: bool = False  # Email vérifié
-    
-    # Pour les GUIDE et PROVIDER : lien vers profil métier
-    profil_type: Optional[str] = None  # "guide", "artisan", "restaurant"
-    profil_id: Optional[str] = None  # ID du guide/provider associé
-    
-    # Pour PROVIDER : statut de vérification du profil métier
-    profil_verifiee: bool = False  # Vérification du profil business (par ADMIN)
-        # Photo de profil
-    photo_url: Optional[str] = None
-        # Métadonnées
-    date_creation: datetime = Field(default_factory=datetime.utcnow)
-    date_derniere_connexion: Optional[datetime] = None
-    adresse_ip_derniere_connexion: Optional[str] = None
-    
-    # Permissions additionnelles
-    permissions_specifiques: List[str] = []
-    
+    status: UserStatus = UserStatus.ACTIVE
+    is_verified: bool = False
+    avatar_url: Optional[str] = None
+    preferred_language: str = "fr"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    last_login_at: Optional[datetime] = None
+
     class Config:
         populate_by_name = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
+        use_enum_values = True
+        json_schema_extra = {
+            "example": {
+                "full_name": "Awa Traoré",
+                "email": "awa.traore@example.com",
+                "phone": "+22670000000",
+                "role": "tourist",
+            }
         }
-
-
-class UserPublic(BaseModel):
-    """Schéma utilisateur pour les réponses publiques"""
-    id: Optional[str] = None
-    email: str
-    telephone: Optional[str] = None
-    nom_complet: str
-    photo_url: Optional[str] = None
-    role: UserRole
-    actif: bool
-    verifiee: bool
-    profil_type: Optional[str] = None
-    profil_verifiee: bool = False
-    date_creation: datetime
-    
-    class Config:
-        populate_by_name = True

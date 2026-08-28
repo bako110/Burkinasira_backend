@@ -1,83 +1,58 @@
-from fastapi import APIRouter, HTTPException, Query
-from typing import List
-from app.schemas.emergency import EmergencyCreate, EmergencyUpdate, EmergencyResponse
-from app.services.emergency_service import EmergencyServiceService
+from typing import Optional
+from fastapi import APIRouter, Depends, status
+from app.core.security import get_current_user, require_role
+from app.models.user import UserRole
+from app.schemas.auth import TokenPayload
+from app.schemas.emergency import (
+    CreateEmergencyContactRequest,
+    UpdateEmergencyContactRequest,
+    EmergencyContactResponse,
+    TriggerSOSRequest,
+    SOSAlertResponse,
+)
+from app.services import emergency_service
 
-router = APIRouter(prefix="/emergency-services", tags=["Emergency Services"])
-service = EmergencyServiceService()
-
-
-@router.post("/", response_model=dict, status_code=201)
-async def create_service(svc: EmergencyCreate):
-    """Créer un service d'urgence"""
-    service_id = await service.create_service(svc)
-    return {"id": service_id, "message": "Emergency service created"}
-
-
-@router.get("/", response_model=List[EmergencyResponse])
-async def list_services(skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100)):
-    """Récupérer tous les services"""
-    return await service.get_all_services(skip, limit)
+router = APIRouter(prefix="/emergency-services", tags=["Urgences et sécurité"])
 
 
-@router.get("/operational", response_model=List[EmergencyResponse])
-async def get_operational():
-    """Récupérer les services opérationnels"""
-    return await service.get_operational_services()
+@router.get("/contacts", response_model=list)
+async def list_emergency_contacts(region: Optional[str] = None):
+    """Numéros officiels : Police, Pompiers, Gendarmerie, SAMU (§10)."""
+    return await emergency_service.list_contacts(region)
 
 
-@router.get("/type/{type_service}", response_model=List[EmergencyResponse])
-async def get_by_type(type_service: str):
-    """Récupérer les services par type (police, ambulance, pompiers)"""
-    return await service.get_services_by_type(type_service)
+@router.post("/contacts", response_model=EmergencyContactResponse, status_code=status.HTTP_201_CREATED)
+async def create_emergency_contact(
+    data: CreateEmergencyContactRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Ajouter un numéro officiel."""
+    return await emergency_service.create_contact(data)
 
 
-@router.get("/region/{region}", response_model=List[EmergencyResponse])
-async def get_by_region(region: str):
-    """Récupérer les services d'une région"""
-    return await service.get_services_by_region(region)
+@router.patch("/contacts/{contact_id}", response_model=EmergencyContactResponse)
+async def update_emergency_contact(
+    contact_id: str,
+    data: UpdateEmergencyContactRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Mettre à jour un numéro officiel."""
+    return await emergency_service.update_contact(contact_id, data)
 
 
-@router.get("/fastest/{type_service}", response_model=EmergencyResponse)
-async def get_fastest(type_service: str):
-    """Récupérer le service avec temps de réponse le plus court"""
-    result = await service.get_fastest_response(type_service)
-    if not result:
-        raise HTTPException(status_code=404, detail="Service not found")
-    return result
+@router.delete("/contacts/{contact_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_emergency_contact(
+    contact_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Supprimer un numéro officiel."""
+    await emergency_service.delete_contact(contact_id)
 
 
-@router.get("/{service_id}", response_model=EmergencyResponse)
-async def get_one(service_id: str):
-    """Récupérer un service"""
-    result = await service.get_service(service_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Service not found")
-    return result
-
-
-@router.put("/{service_id}")
-async def update_one(service_id: str, svc: EmergencyUpdate):
-    """Mettre à jour un service"""
-    success = await service.update_service(service_id, svc)
-    if not success:
-        raise HTTPException(status_code=404, detail="Service not found")
-    return {"message": "Service updated"}
-
-
-@router.post("/{service_id}/response-time")
-async def update_response_time(service_id: str, minutes: int = Query(..., ge=1, le=300)):
-    """Mettre à jour le temps de réponse moyen"""
-    success = await service.update_response_time(service_id, minutes)
-    if not success:
-        raise HTTPException(status_code=404, detail="Service not found")
-    return {"message": f"Response time updated to {minutes} minutes"}
-
-
-@router.delete("/{service_id}")
-async def delete_one(service_id: str):
-    """Supprimer un service"""
-    success = await service.delete_service(service_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Service not found")
-    return {"message": "Service deleted"}
+@router.post("/sos", response_model=SOSAlertResponse, status_code=status.HTTP_201_CREATED)
+async def trigger_sos(
+    data: TriggerSOSRequest,
+    current_user: TokenPayload = Depends(get_current_user),
+):
+    """Déclencher le bouton SOS : partage de localisation, contact de confiance, numéros d'urgence (§10)."""
+    return await emergency_service.trigger_sos(data, current_user.sub)

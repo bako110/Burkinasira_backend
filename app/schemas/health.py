@@ -1,51 +1,70 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
 from datetime import datetime
+from typing import Optional, List
+from pydantic import BaseModel, Field
+from app.models.destination import GeoPoint, DataSource, OpeningHours
+from app.models.health import HealthFacilityType, HealthFacilityStatus
 
 
-class HealthCreate(BaseModel):
-    """Schéma pour créer une installation sanitaire"""
-    nom: str
-    type_etablissement: str
-    ville: str
+class CreateHealthFacilityRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=150)
+    type: HealthFacilityType
+    description: Optional[str] = None
     region: str
-    province: str
-    localite: str
-    adresse: str
-    latitude: float
-    longitude: float
-    telephone_principal: str
-    horaires_ouverture: str
-    services: List[str]
-    ouvert_24h: bool = False
-    equipements: List[str] = []
+    city: Optional[str] = None
+    location: GeoPoint
+    address: Optional[str] = None
+    opening_hours: List[OpeningHours] = []
+    is_on_duty: bool = False
+    services: List[str] = []
+    contact_phone: Optional[str] = None
 
 
-class HealthUpdate(BaseModel):
-    """Schéma pour mettre à jour une installation sanitaire"""
-    nom: Optional[str] = None
-    type_etablissement: Optional[str] = None
-    telephone_principal: Optional[str] = None
-    horaires_ouverture: Optional[str] = None
+class UpdateHealthFacilityRequest(BaseModel):
+    name: Optional[str] = None
+    type: Optional[HealthFacilityType] = None
+    description: Optional[str] = None
+    region: Optional[str] = None
+    city: Optional[str] = None
+    location: Optional[GeoPoint] = None
+    address: Optional[str] = None
+    opening_hours: Optional[List[OpeningHours]] = None
+    is_on_duty: Optional[bool] = None
     services: Optional[List[str]] = None
-    ouvert_24h: Optional[bool] = None
-    equipements: Optional[List[str]] = None
+    contact_phone: Optional[str] = None
+    status: Optional[HealthFacilityStatus] = None
 
 
-class HealthResponse(BaseModel):
-    """Schéma de réponse pour une installation sanitaire"""
-    id: Optional[str] = None
-    nom: str
-    type_etablissement: str
-    ville: str
+class HealthFacilitySummary(BaseModel):
+    id: str
+    name: str
+    type: HealthFacilityType
     region: str
-    adresse: str
-    telephone_principal: str
-    latitude: float
-    longitude: float
+    city: Optional[str] = None
+    location: GeoPoint
+    is_on_duty: bool
+    contact_phone: Optional[str] = None
+
+
+class HealthFacilityDetail(BaseModel):
+    id: str
+    name: str
+    type: HealthFacilityType
+    description: Optional[str] = None
+    region: str
+    city: Optional[str] = None
+    location: GeoPoint
+    address: Optional[str] = None
+    opening_hours: List[OpeningHours]
+    is_on_duty: bool
     services: List[str]
-    ouvert_24h: bool
-    urgence_disponible: bool
-    
-    class Config:
-        populate_by_name = True
+    contact_phone: Optional[str] = None
+    data_source: DataSource
+    created_at: datetime
+    updated_at: datetime
+
+
+class HealthFacilityListResponse(BaseModel):
+    items: List[HealthFacilitySummary]
+    total: int
+    page: int
+    page_size: int

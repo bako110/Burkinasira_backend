@@ -16,6 +16,7 @@ pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 # Bearer token
 security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
 
 # Clé secrète pour JWT
 SECRET_KEY = settings.SECRET_KEY if hasattr(settings, 'SECRET_KEY') else "your-secret-key-change-in-production"
@@ -94,7 +95,16 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     return decode_token(token)
 
 
-async def require_role(*allowed_roles: UserRole):
+async def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security),
+) -> Optional[TokenPayload]:
+    """Récupérer l'utilisateur courant si un token est fourni, sinon None (ex: signalement anonyme)"""
+    if credentials is None:
+        return None
+    return decode_token(credentials.credentials)
+
+
+def require_role(*allowed_roles: UserRole):
     """Factory pour créer une dépendance de vérification de rôle"""
     async def check_role(current_user: TokenPayload = Depends(get_current_user)) -> TokenPayload:
         if current_user.role not in allowed_roles:

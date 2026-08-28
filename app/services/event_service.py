@@ -1,83 +1,146 @@
-from typing import List, Optional
-from bson import ObjectId
-from app.schemas.event import EventCreate, EventUpdate
-from app.core.database import get_database
 from datetime import datetime
-import logging
+from typing import Optional
+from bson import ObjectId
+from fastapi import HTTPException, status
+from app.core.database import get_database
+from app.models.event import EventCategory, EventStatus
+from app.schemas.event import (
+    CreateEventRequest,
+    UpdateEventRequest,
+    EventSummary,
+    EventDetail,
+    EventListResponse,
+)
 
-logger = logging.getLogger(__name__)
+COLLECTION = "events"
 
 
-class EventService:
-    """Service pour gérer les événements locaux"""
-    
-    def __init__(self):
-        self.collection_name = "events"
-    
-    async def create_event(self, event: EventCreate) -> str:
-        """Créer un événement"""
-        try:
-            db = get_database()
-            event_dict = event.model_dump()
-            result = await db[self.collection_name].insert_one(event_dict)
-            logger.info(f"Événement créé: {result.inserted_id}")
-            return str(result.inserted_id)
-        except Exception as e:
-            logger.error(f"Erreur lors de la création d'un événement: {e}")
-            raise
-    
-    async def get_upcoming_events(self, limit: int = 10) -> List[dict]:
-        """Récupérer les événements à venir"""
-        try:
-            events = []
-            async for event in self.collection.find({
-                "date_debut": {"$gte": datetime.utcnow()},
-                "publie": True
-            }).sort("date_debut", 1).limit(limit):
-                event["id"] = str(event["_id"])
-                events.append(event)
-            return events
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des événements à venir: {e}")
-            raise
-    
-    async def get_events_by_region(self, region: str) -> List[dict]:
-        """Récupérer les événements par région"""
-        try:
-            events = []
-            async for event in self.collection.find({
-                "region": region,
-                "publie": True
-            }).sort("date_debut", 1):
-                event["id"] = str(event["_id"])
-                events.append(event)
-            return events
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des événements par région: {e}")
-            raise
-    
-    async def get_events_by_type(self, type_evenement: str) -> List[dict]:
-        """Récupérer les événements par type"""
-        try:
-            events = []
-            async for event in self.collection.find({
-                "type_evenement": type_evenement,
-                "publie": True
-            }).sort("date_debut", 1):
-                event["id"] = str(event["_id"])
-                events.append(event)
-            return events
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des événements par type: {e}")
-            raise
-    
-    async def get_event(self, event_id: str) -> Optional[dict]:
-        """Récupérer un événement par ID"""
-        try:
-            event = await self.collection.find_one({"_id": ObjectId(event_id)})
-            if event:
-                event["id"] = str(event["_id"])
-            return event
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération de l'événement: {e}")
-            raise
+def _to_summary(doc: dict) -> EventSummary:
+    return EventSummary(
+        id=str(doc["_id"]),
+        title=doc["title"],
+        category=doc["category"],
+        region=doc["region"],
+        city=doc.get("city"),
+        photo=doc["photos"][0] if doc.get("photos") else None,
+        start_date=doc["start_date"],
+        end_date=doc.get("end_date"),
+        ticket_price=doc.get("ticket_price"),
+        currency=doc.get("currency", "XOF"),
+        requires_ticket=doc.get("requires_ticket", False),
+    )
+
+
+def _to_detail(doc: dict) -> EventDetail:
+    return EventDetail(
+        id=str(doc["_id"]),
+        organizer_id=doc["organizer_id"],
+        title=doc["title"],
+        description=doc["description"],
+        category=doc["category"],
+        region=doc["region"],
+        city=doc.get("city"),
+        location=doc["location"],
+        address=doc.get("address"),
+        photos=doc.get("photos", []),
+        start_date=doc["start_date"],
+        end_date=doc.get("end_date"),
+        program=doc.get("program", []),
+        ticket_price=doc.get("ticket_price"),
+        currency=doc.get("currency", "XOF"),
+        requires_ticket=doc.get("requires_ticket", False),
+        linked_hotel_ids=doc.get("linked_hotel_ids", []),
+        linked_transport_provider_ids=doc.get("linked_transport_provider_ids", []),
+        data_source=doc.get("data_source", {}),
+        created_at=doc["created_at"],
+        updated_at=doc["updated_at"],
+    )
+
+
+async def create_event(data: CreateEventRequest, organizer_id: str) -> EventDetail:
+    db = get_database()
+    now = datetime.utcnow()
+    doc = data.model_dump()
+    doc["organizer_id"] = organizer_id
+    doc["status"] = EventStatus.PUBLISHED.value
+    doc["data_source"] = {"verified": False, "source": None, "last_updated_at": now}
+    doc["created_at"] = now
+    doc["updated_at"] = now
+    result = await db[COLLECTION].insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return _to_detail(doc)
+
+
+async def list_events(
+    category: Optional[EventCategory] = None,
+    region: Optional[str] = None,
+    upcoming_only: bool = True,
+    q: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> EventListResponse:
+    db = get_database()
+    query: dict = {"status": EventStatus.PUBLISHED.value}
+    if category:
+        query["category"] = category.value if isinstance(category, EventCategory) else category
+    if region:
+        query["region"] = region
+    if upcoming_only:
+        query["start_date"] = {"$gte": datetime.utcnow()}
+    if q:
+        query["$or"] = [
+            {"title": {"$regex": q, "$options": "i"}},
+            {"description": {"$regex": q, "$options": "i"}},
+        ]
+
+    total = await db[COLLECTION].count_documents(query)
+    skip = (page - 1) * page_size
+    cursor = db[COLLECTION].find(query).sort("start_date", 1).skip(skip).limit(page_size)
+    docs = await cursor.to_list(length=page_size)
+
+    return EventListResponse(
+        items=[_to_summary(d) for d in docs],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+
+async def get_event(event_id: str) -> EventDetail:
+    db = get_database()
+    if not ObjectId.is_valid(event_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Événement introuvable")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(event_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Événement introuvable")
+    return _to_detail(doc)
+
+
+async def update_event(event_id: str, data: UpdateEventRequest, current_user_id: str, is_admin: bool) -> EventDetail:
+    db = get_database()
+    if not ObjectId.is_valid(event_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Événement introuvable")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(event_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Événement introuvable")
+    if doc["organizer_id"] != current_user_id and not is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez modifier que vos propres événements")
+
+    update_fields = data.model_dump(exclude_unset=True, exclude_none=True)
+    if update_fields:
+        update_fields["updated_at"] = datetime.utcnow()
+        await db[COLLECTION].update_one({"_id": ObjectId(event_id)}, {"$set": update_fields})
+
+    return await get_event(event_id)
+
+
+async def delete_event(event_id: str, current_user_id: str, is_admin: bool) -> None:
+    db = get_database()
+    if not ObjectId.is_valid(event_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Événement introuvable")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(event_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Événement introuvable")
+    if doc["organizer_id"] != current_user_id and not is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez supprimer que vos propres événements")
+    await db[COLLECTION].delete_one({"_id": ObjectId(event_id)})

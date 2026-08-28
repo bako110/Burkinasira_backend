@@ -1,158 +1,128 @@
-from typing import List, Optional
+from datetime import datetime
+from typing import Optional
 from bson import ObjectId
-from app.models.user import User, UserRole
-from app.schemas.auth import UserRegister, TokenResponse
+from fastapi import HTTPException, status
 from app.core.database import get_database
 from app.core.security import hash_password, verify_password, create_access_token
-from datetime import datetime
-import logging
+from app.models.user import UserRole, UserStatus
+from app.schemas.auth import (
+    RegisterRequest,
+    LoginRequest,
+    UpdateProfileRequest,
+    UserPublic,
+    TokenResponse,
+)
 
-logger = logging.getLogger(__name__)
+COLLECTION = "users"
 
 
-class UserService:
-    """Service pour gérer les utilisateurs"""
-    
-    def __init__(self):
-        self.collection_name = "users"
-    
-    async def register_user(self, user_data: UserRegister) -> str:
-        """Enregistrer un nouvel utilisateur"""
-        try:
-            db = get_database()
-            
-            # Vérifier que l'email n'existe pas déjà
-            existing = await db[self.collection_name].find_one({"email": user_data.email})
-            if existing:
-                raise ValueError("Email déjà utilisé")
-            
-            # Vérifier que le téléphone n'existe pas déjà (si fourni)
-            if user_data.telephone:
-                existing_phone = await db[self.collection_name].find_one({"telephone": user_data.telephone})
-                if existing_phone:
-                    raise ValueError("Numéro de téléphone déjà utilisé")
-            
-            # Créer le document utilisateur
-            # Empêcher l'auto-attribution du rôle ADMIN (sécurité)
-            role = user_data.role if user_data.role != UserRole.ADMIN else UserRole.TOURIST
-            
-            user_dict = {
-                "email": user_data.email,
-                "nom_complet": user_data.nom_complet,
-                "motdepasse_hash": hash_password(user_data.motdepasse),
-                "role": role.value,
-                "profil_type": user_data.profil_type,
-                "telephone": user_data.telephone,
-                "actif": True,
-                "verifiee": False,  # À vérifier par email
-                "date_creation": datetime.utcnow(),
-                "permissions_specifiques": []
-            }
-            
-            result = await db[self.collection_name].insert_one(user_dict)
-            logger.info(f"Nouvel utilisateur créé: {result.inserted_id}")
-            return str(result.inserted_id)
-            
-        except Exception as e:
-            logger.error(f"Erreur lors de l'enregistrement: {e}")
-            raise
-    
-    async def authenticate_user(self, login: str, motdepasse: str) -> Optional[dict]:
-        """Authentifier un utilisateur avec email OU téléphone"""
-        try:
-            db = get_database()
-            
-            # Chercher par email OU téléphone
-            import re
-            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-            
-            if re.match(email_pattern, login):
-                # C'est un email
-                user = await db[self.collection_name].find_one({"email": login})
-            else:
-                # C'est un numéro de téléphone
-                user = await db[self.collection_name].find_one({"telephone": login})
-            
-            if not user:
-                return None
-            
-            if not user.get("actif"):
-                raise ValueError("Utilisateur désactivé")
-            
-            if not verify_password(motdepasse, user.get("motdepasse_hash", "")):
-                return None
-            
-            # Mettre à jour la dernière connexion
-            await db[self.collection_name].update_one(
-                {"_id": user["_id"]},
-                {"$set": {"date_derniere_connexion": datetime.utcnow()}}
-            )
-            
-            return user
-            
-        except Exception as e:
-            logger.error(f"Erreur lors de l'authentification: {e}")
-            raise
-    
-    async def get_user_by_id(self, user_id: str) -> Optional[dict]:
-        """Récupérer un utilisateur par ID"""
-        try:
-            db = get_database()
-            user = await db[self.collection_name].find_one({"_id": ObjectId(user_id)})
-            if user:
-                user["id"] = str(user["_id"])
-            return user
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération: {e}")
-            raise
-    
-    async def get_user_by_email(self, email: str) -> Optional[dict]:
-        """Récupérer un utilisateur par email"""
-        try:
-            db = get_database()
-            user = await db[self.collection_name].find_one({"email": email})
-            if user:
-                user["id"] = str(user["_id"])
-            return user
-        except Exception as e:
-            logger.error(f"Erreur: {e}")
-            raise
-    
-    async def update_user_role(self, user_id: str, new_role: UserRole) -> bool:
-        """Changer le rôle d'un utilisateur (ADMIN ONLY)"""
-        try:
-            db = get_database()
-            result = await db[self.collection_name].update_one(
-                {"_id": ObjectId(user_id)},
-                {"$set": {"role": new_role.value}}
-            )
-            return result.modified_count > 0
-        except Exception as e:
-            logger.error(f"Erreur: {e}")
-            raise
-    
-    async def deactivate_user(self, user_id: str) -> bool:
-        """Désactiver un utilisateur"""
-        try:
-            db = get_database()
-            result = await db[self.collection_name].update_one(
-                {"_id": ObjectId(user_id)},
-                {"$set": {"actif": False}}
-            )
-            return result.modified_count > 0
-        except Exception as e:
-            logger.error(f"Erreur: {e}")
-            raise
-    
-    async def get_users_by_role(self, role: UserRole) -> List[dict]:
-        """Récupérer tous les utilisateurs avec un rôle spécifique"""
-        try:
-            db = get_database()
-            users = []
-            async for user in db[self.collection_name].find({"role": role.value}):
-                user["id"] = str(user["_id"])
-                users.append(user)
-            return users
-        except Exception as e:
-            logger.error(f"Erreur: {e}")
-            raise
+def _to_public(doc: dict) -> UserPublic:
+    return UserPublic(
+        id=str(doc["_id"]),
+        full_name=doc["full_name"],
+        email=doc["email"],
+        phone=doc.get("phone"),
+        role=doc["role"],
+        is_verified=doc.get("is_verified", False),
+        avatar_url=doc.get("avatar_url"),
+        preferred_language=doc.get("preferred_language", "fr"),
+        created_at=doc["created_at"],
+    )
+
+
+async def register_user(data: RegisterRequest) -> TokenResponse:
+    db = get_database()
+    existing = await db[COLLECTION].find_one({"email": data.email.lower()})
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Un compte existe déjà avec cet email",
+        )
+
+    now = datetime.utcnow()
+    doc = {
+        "full_name": data.full_name,
+        "email": data.email.lower(),
+        "phone": data.phone,
+        "hashed_password": hash_password(data.password),
+        "role": data.role.value,
+        "status": UserStatus.ACTIVE.value,
+        "is_verified": False,
+        "avatar_url": None,
+        "preferred_language": "fr",
+        "created_at": now,
+        "updated_at": now,
+        "last_login_at": now,
+    }
+    result = await db[COLLECTION].insert_one(doc)
+    doc["_id"] = result.inserted_id
+
+    token, expires_at = create_access_token(
+        user_id=str(doc["_id"]), email=doc["email"], role=data.role
+    )
+    return TokenResponse(access_token=token, expires_at=expires_at, user=_to_public(doc))
+
+
+async def login_user(data: LoginRequest) -> TokenResponse:
+    db = get_database()
+    doc = await db[COLLECTION].find_one({"email": data.email.lower()})
+    if not doc or not verify_password(data.password, doc["hashed_password"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email ou mot de passe incorrect",
+        )
+    if doc.get("status") != UserStatus.ACTIVE.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Ce compte est suspendu ou supprimé",
+        )
+
+    await db[COLLECTION].update_one(
+        {"_id": doc["_id"]}, {"$set": {"last_login_at": datetime.utcnow()}}
+    )
+
+    token, expires_at = create_access_token(
+        user_id=str(doc["_id"]), email=doc["email"], role=UserRole(doc["role"])
+    )
+    return TokenResponse(access_token=token, expires_at=expires_at, user=_to_public(doc))
+
+
+async def get_user_by_id(user_id: str) -> UserPublic:
+    db = get_database()
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur introuvable")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(user_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur introuvable")
+    return _to_public(doc)
+
+
+async def update_profile(user_id: str, data: UpdateProfileRequest) -> UserPublic:
+    db = get_database()
+    update_fields = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+    if update_fields:
+        update_fields["updated_at"] = datetime.utcnow()
+        await db[COLLECTION].update_one({"_id": ObjectId(user_id)}, {"$set": update_fields})
+    return await get_user_by_id(user_id)
+
+
+async def change_password(user_id: str, current_password: str, new_password: str) -> None:
+    db = get_database()
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(user_id)})
+    if not doc or not verify_password(current_password, doc["hashed_password"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Mot de passe actuel incorrect",
+        )
+    await db[COLLECTION].update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"hashed_password": hash_password(new_password), "updated_at": datetime.utcnow()}},
+    )
+
+
+async def delete_account(user_id: str) -> None:
+    db = get_database()
+    await db[COLLECTION].update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"status": UserStatus.DELETED.value, "updated_at": datetime.utcnow()}},
+    )

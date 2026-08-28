@@ -1,83 +1,67 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from enum import Enum
 from datetime import datetime
+from typing import Optional, List
+from pydantic import BaseModel, Field
+from app.models.destination import GeoPoint, DataSource
+
+
+class AccommodationType(str, Enum):
+    HOTEL = "hotel"
+    AUBERGE = "auberge"
+    CAMPEMENT = "campement"
+    MAISON_HOTES = "maison_hotes"
+    RESIDENCE = "residence"
+    HEBERGEMENT_HABITANT = "hebergement_habitant"
+    HEBERGEMENT_COMMUNAUTAIRE = "hebergement_communautaire"
+
+
+class HotelStatus(str, Enum):
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"
+
+
+class RoomType(BaseModel):
+    name: str
+    capacity: int = 2
+    price_per_night: float
+    currency: str = "XOF"
+    total_rooms: int = 1
+    amenities: List[str] = []
+
+
+class Offer(BaseModel):
+    title: str
+    description: Optional[str] = None
+    discount_percent: Optional[float] = None
+    valid_from: Optional[datetime] = None
+    valid_until: Optional[datetime] = None
 
 
 class Hotel(BaseModel):
-    """Modèle pour les hôtels et hébergements"""
-    
-    id: Optional[str] = Field(None, alias="_id")
-    nom: str = Field(..., description="Nom de l'hôtel")
-    description: str = Field(..., description="Description de l'établissement")
-    
-    # Localisation
-    ville: str = Field(..., description="Ville où se trouve l'hôtel")
-    region: str = Field(..., description="Région")
-    adresse: str = Field(..., description="Adresse complète")
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    
-    # Classification
-    categorie: str = Field(
-        ..., 
-        description="Catégorie: luxe, haut_standing, standard, budget, auberge"
-    )
-    nombre_etoiles: int = Field(1, ge=1, le=5, description="Nombre d'étoiles")
-    
-    # Chambres
-    nombre_chambres: int = Field(..., description="Nombre total de chambres")
-    types_chambres: List[str] = Field(
-        default=[], 
-        description="Types de chambres: simple, double, suite, duplex, etc."
-    )
-    
-    # Tarifs
-    tarif_nuit_min_fcfa: float = Field(..., description="Tarif minimum par nuit en FCFA")
-    tarif_nuit_max_fcfa: float = Field(..., description="Tarif maximum par nuit en FCFA")
-    petit_dejeuner_inclus: bool = Field(False)
-    
-    # Services et équipements
-    services: List[str] = Field(
-        default=[],
-        description="Services: wifi, parking, restaurant, bar, piscine, gym, spa, etc."
-    )
-    equipements: List[str] = Field(
-        default=[],
-        description="Équipements: climatisation, chauffage, tv, minibar, etc."
-    )
-    
-    # Contact
-    telephone: Optional[str] = None
-    email: Optional[str] = None
-    website: Optional[str] = None
-    
-    # Images
-    image: Optional[str] = None
-    images: List[str] = Field(default=[])
-    
-    # Évaluations
-    note_moyenne: float = Field(default=0, ge=0, le=5)
-    nombre_evaluations: int = Field(default=0)
-    
-    # Métadonnées
-    publie: bool = Field(True)
-    date_creation: datetime = Field(default_factory=datetime.utcnow)
-    date_modification: datetime = Field(default_factory=datetime.utcnow)
-    
+    id: Optional[str] = Field(default=None, alias="_id")
+    owner_id: str
+    name: str
+    type: AccommodationType
+    description: str
+    region: str
+    city: Optional[str] = None
+    location: GeoPoint
+    address: Optional[str] = None
+    photos: List[str] = []
+    amenities: List[str] = []
+    room_types: List[RoomType] = []
+    offers: List[Offer] = []
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
+    average_rating: float = 0.0
+    review_count: int = 0
+    is_verified: bool = False
+    status: HotelStatus = HotelStatus.PUBLISHED
+    data_source: DataSource = DataSource()
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
     class Config:
         populate_by_name = True
-        json_schema_extra = {
-            "example": {
-                "nom": "Hôtel Splendid",
-                "description": "Hôtel haut standing au cœur de Ouagadougou",
-                "ville": "Ouagadougou",
-                "region": "Kadiogo",
-                "adresse": "Avenue Kléber, Ouagadougou",
-                "categorie": "haut_standing",
-                "nombre_etoiles": 4,
-                "nombre_chambres": 50,
-                "tarif_nuit_min_fcfa": 35000,
-                "tarif_nuit_max_fcfa": 100000,
-                "services": ["wifi", "restaurant", "bar", "piscine", "gym"]
-            }
-        }
+        use_enum_values = True

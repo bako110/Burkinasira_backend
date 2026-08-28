@@ -1,206 +1,176 @@
-from typing import List, Optional
-from bson import ObjectId
-from app.schemas.booking import BookingCreate, BookingUpdate
-from app.core.database import get_database
+import secrets
 from datetime import datetime
-import logging
+from typing import Optional
+from bson import ObjectId
+from fastapi import HTTPException, status
+from app.core.database import get_database
+from app.models.booking import BookingStatus
+from app.schemas.booking import (
+    CreateBookingRequest,
+    BookingResponse,
+    InvoiceResponse,
+)
 
-logger = logging.getLogger(__name__)
+COLLECTION = "bookings"
+INVOICES_COLLECTION = "booking_invoices"
+
+CANCELLABLE_STATUSES = {BookingStatus.PENDING.value, BookingStatus.CONFIRMED.value}
 
 
-class BookingService:
-    """Service pour gérer les réservations"""
-    
-    def __init__(self):
-        self.collection_name = "bookings"
-    
-    async def create_booking(self, booking: BookingCreate, client_id: str) -> str:
-        """Créer une réservation"""
-        try:
-            db = get_database()
-            booking_dict = booking.model_dump()
-            # Ajouter les champs de gestion
-            booking_dict["client_id"] = client_id
-            booking_dict["statut_reservation"] = "en_attente"
-            booking_dict["statut_paiement"] = "non_paye"
-            booking_dict["date_creation"] = datetime.utcnow()
-            booking_dict["date_modification"] = datetime.utcnow()
-            result = await db[self.collection_name].insert_one(booking_dict)
-            logger.info(f"Réservation créée: {result.inserted_id} pour client {client_id}")
-            return str(result.inserted_id)
-        except Exception as e:
-            logger.error(f"Erreur lors de la création d'une réservation: {e}")
-            raise
-    
-    async def get_booking(self, booking_id: str) -> Optional[dict]:
-        """Récupérer une réservation par ID"""
-        try:
-            db = get_database()
-            booking = await db[self.collection_name].find_one({"_id": ObjectId(booking_id)})
-            if booking:
-                booking["id"] = str(booking["_id"])
-            return booking
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération de la réservation: {e}")
-            raise
-    
-    async def get_bookings_by_client(self, email_client: str, skip: int = 0, limit: int = 100) -> List[dict]:
-        """Récupérer les réservations d'un client (par client_id ou client_email)"""
-        try:
-            db = get_database()
-            bookings = []
-            # Chercher par client_id (user_id) OU client_email
-            query = {"$or": [{"client_id": email_client}, {"client_email": email_client}]}
-            async for booking in db[self.collection_name].find(query).skip(skip).limit(limit):
-                booking["id"] = str(booking["_id"])
-                bookings.append(booking)
-            return bookings
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des réservations du client: {e}")
-            raise
-    
-    async def get_bookings_by_resource(self, ressource_id: str) -> List[dict]:
-        """Récupérer les réservations pour une ressource"""
-        try:
-            db = get_database()
-            bookings = []
-            async for booking in db[self.collection_name].find({"ressource_id": ressource_id}):
-                booking["id"] = str(booking["_id"])
-                bookings.append(booking)
-            return bookings
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des réservations: {e}")
-            raise
+def _generate_reference() -> str:
+    year = datetime.utcnow().year
+    suffix = secrets.token_hex(3).upper()
+    return f"GT-{year}-{suffix}"
 
-    async def get_bookings_by_guide(self, guide_id: str, skip: int = 0, limit: int = 100) -> List[dict]:
-        """Récupérer les réservations assignées à un guide."""
-        try:
-            db = get_database()
-            bookings = []
 
-            # Compatibilité: certaines réservations historiques peuvent stocker
-            # soit user_id du guide, soit l'id du profil guide dans guide_id/ressource_id.
-            profile_id = None
-            try:
-                guide_doc = await db["guides"].find_one({"user_id": guide_id})
-                if guide_doc and guide_doc.get("_id"):
-                    profile_id = str(guide_doc["_id"])
-            except Exception:
-                profile_id = None
+def _to_response(doc: dict) -> BookingResponse:
+    return BookingResponse(
+        id=str(doc["_id"]),
+        booking_reference=doc["booking_reference"],
+        customer_id=doc["customer_id"],
+        item_type=doc["item_type"],
+        item_id=doc["item_id"],
+        item_title=doc["item_title"],
+        quantity=doc["quantity"],
+        unit_price=doc["unit_price"],
+        total_price=doc["total_price"],
+        currency=doc.get("currency", "XOF"),
+        scheduled_date=doc.get("scheduled_date"),
+        status=doc.get("status", BookingStatus.PENDING.value),
+        ticket_qr_code=doc["ticket_qr_code"],
+        cancellation_reason=doc.get("cancellation_reason"),
+        created_at=doc["created_at"],
+    )
 
-            or_conditions = [
-                {"guide_id": guide_id},
-                {"type_reservation": "guide", "ressource_id": guide_id},
-            ]
 
-            if profile_id:
-                or_conditions.extend([
-                    {"guide_id": profile_id},
-                    {"type_reservation": "guide", "ressource_id": profile_id},
-                ])
+async def create_booking(data: CreateBookingRequest, customer_id: str) -> BookingResponse:
+    db = get_database()
+    now = datetime.utcnow()
+    reference = _generate_reference()
 
-            query = {"$or": or_conditions}
+    doc = data.model_dump()
+    doc["customer_id"] = customer_id
+    doc["booking_reference"] = reference
+    doc["total_price"] = data.unit_price * data.quantity
+    doc["status"] = BookingStatus.PENDING.value
+    doc["ticket_qr_code"] = reference
+    doc["cancellation_reason"] = None
+    doc["created_at"] = now
+    doc["updated_at"] = now
 
-            async for booking in db[self.collection_name].find(query).skip(skip).limit(limit):
-                booking["id"] = str(booking["_id"])
-                bookings.append(booking)
-            return bookings
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des réservations du guide: {e}")
-            raise
-    
-    async def get_bookings_by_status(self, statut: str) -> List[dict]:
-        """Récupérer les réservations par statut"""
-        try:
-            db = get_database()
-            bookings = []
-            async for booking in db[self.collection_name].find({"statut_reservation": statut}):
-                booking["id"] = str(booking["_id"])
-                bookings.append(booking)
-            return bookings
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des réservations par statut: {e}")
-            raise
-    
-    async def update_booking(self, booking_id: str, booking_update: BookingUpdate) -> bool:
-        """Mettre à jour une réservation"""
-        try:
-            db = get_database()
-            update_data = booking_update.model_dump(exclude_unset=True)
-            if update_data:
-                update_data["date_modification"] = datetime.utcnow()
-                result = await db[self.collection_name].update_one(
-                    {"_id": ObjectId(booking_id)},
-                    {"$set": update_data}
-                )
-                return result.modified_count > 0
-            return False
-        except Exception as e:
-            logger.error(f"Erreur lors de la mise à jour de la réservation: {e}")
-            raise
-    
-    async def cancel_booking(self, booking_id: str, raison: str) -> bool:
-        """Annuler une réservation"""
-        try:
-            db = get_database()
-            result = await db[self.collection_name].update_one(
-                {"_id": ObjectId(booking_id)},
-                {"$set": {
-                    "statut_reservation": "annulee",
-                    "date_annulation": datetime.utcnow(),
-                    "raison_annulation": raison
-                }}
-            )
-            return result.modified_count > 0
-        except Exception as e:
-            logger.error(f"Erreur lors de l'annulation de la réservation: {e}")
-            raise
-    
-    async def get_all_bookings(self, skip: int = 0, limit: int = 100) -> List[dict]:
-        """Récupérer toutes les réservations (ADMIN)"""
-        try:
-            db = get_database()
-            bookings = []
-            async for booking in db[self.collection_name].find().skip(skip).limit(limit):
-                booking["id"] = str(booking["_id"])
-                bookings.append(booking)
-            return bookings
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération de toutes les réservations: {e}")
-            raise
+    result = await db[COLLECTION].insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return _to_response(doc)
 
-    async def get_high_value_bookings(self, min_amount: float) -> List[dict]:
-        """Récupérer les réservations de haute valeur (ADMIN)"""
-        try:
-            db = get_database()
-            bookings = []
-            async for booking in db[self.collection_name].find({"montant_final_fcfa": {"$gte": min_amount}}):
-                booking["id"] = str(booking["_id"])
-                bookings.append(booking)
-            return bookings
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération des réservations haute valeur: {e}")
-            raise
 
-    async def get_revenue_by_date_range(self, date_start: datetime, date_end: datetime) -> float:
-        """Calcul des revenus pour une plage de dates"""
-        try:
-            db = get_database()
-            result = await db[self.collection_name].aggregate([
-                {
-                    "$match": {
-                        "date_creation": {"$gte": date_start, "$lte": date_end},
-                        "statut_paiement": "paye"
-                    }
-                },
-                {
-                    "$group": {
-                        "_id": None,
-                        "total": {"$sum": "$montant_final_fcfa"}
-                    }
-                }
-            ]).to_list(None)
-            return result[0]["total"] if result else 0
-        except Exception as e:
-            logger.error(f"Erreur lors du calcul des revenus: {e}")
-            raise
+async def list_my_bookings(customer_id: str, status_filter: Optional[BookingStatus] = None) -> list:
+    db = get_database()
+    query: dict = {"customer_id": customer_id}
+    if status_filter:
+        query["status"] = status_filter.value if isinstance(status_filter, BookingStatus) else status_filter
+    docs = await db[COLLECTION].find(query).sort("created_at", -1).to_list(length=None)
+    return [_to_response(d) for d in docs]
+
+
+async def get_booking(booking_id: str, current_user_id: str, is_admin: bool) -> BookingResponse:
+    db = get_database()
+    if not ObjectId.is_valid(booking_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Réservation introuvable")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(booking_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Réservation introuvable")
+    if doc["customer_id"] != current_user_id and not is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès non autorisé à cette réservation")
+    return _to_response(doc)
+
+
+async def get_booking_by_reference(reference: str) -> BookingResponse:
+    """Utilisé pour présenter/valider un ticket QR Code."""
+    db = get_database()
+    doc = await db[COLLECTION].find_one({"booking_reference": reference})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket introuvable")
+    return _to_response(doc)
+
+
+async def confirm_booking(booking_id: str) -> BookingResponse:
+    """(Admin/Provider) Confirmer une réservation en attente."""
+    db = get_database()
+    if not ObjectId.is_valid(booking_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Réservation introuvable")
+    result = await db[COLLECTION].update_one(
+        {"_id": ObjectId(booking_id), "status": BookingStatus.PENDING.value},
+        {"$set": {"status": BookingStatus.CONFIRMED.value, "updated_at": datetime.utcnow()}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Réservation introuvable ou déjà traitée")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(booking_id)})
+    return _to_response(doc)
+
+
+async def cancel_booking(booking_id: str, reason: Optional[str], current_user_id: str, is_admin: bool) -> BookingResponse:
+    db = get_database()
+    if not ObjectId.is_valid(booking_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Réservation introuvable")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(booking_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Réservation introuvable")
+    if doc["customer_id"] != current_user_id and not is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès non autorisé à cette réservation")
+    if doc.get("status") not in CANCELLABLE_STATUSES:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cette réservation ne peut plus être annulée")
+
+    await db[COLLECTION].update_one(
+        {"_id": ObjectId(booking_id)},
+        {"$set": {"status": BookingStatus.CANCELLED.value, "cancellation_reason": reason, "updated_at": datetime.utcnow()}},
+    )
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(booking_id)})
+    return _to_response(doc)
+
+
+async def request_refund(booking_id: str, current_user_id: str, is_admin: bool) -> BookingResponse:
+    db = get_database()
+    if not ObjectId.is_valid(booking_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Réservation introuvable")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(booking_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Réservation introuvable")
+    if doc["customer_id"] != current_user_id and not is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès non autorisé à cette réservation")
+    if doc.get("status") != BookingStatus.CANCELLED.value:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Seule une réservation annulée peut être remboursée")
+
+    await db[COLLECTION].update_one(
+        {"_id": ObjectId(booking_id)},
+        {"$set": {"status": BookingStatus.REFUNDED.value, "updated_at": datetime.utcnow()}},
+    )
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(booking_id)})
+    return _to_response(doc)
+
+
+# --- Factures ---
+
+def _invoice_to_response(doc: dict) -> InvoiceResponse:
+    return InvoiceResponse(
+        id=str(doc["_id"]),
+        booking_id=doc["booking_id"],
+        amount=doc["amount"],
+        currency=doc.get("currency", "XOF"),
+        issued_at=doc["issued_at"],
+    )
+
+
+async def get_or_create_invoice(booking_id: str, current_user_id: str, is_admin: bool) -> InvoiceResponse:
+    booking = await get_booking(booking_id, current_user_id, is_admin)
+    db = get_database()
+    doc = await db[INVOICES_COLLECTION].find_one({"booking_id": booking_id})
+    if not doc:
+        doc = {
+            "booking_id": booking_id,
+            "amount": booking.total_price,
+            "currency": booking.currency,
+            "issued_at": datetime.utcnow(),
+        }
+        result = await db[INVOICES_COLLECTION].insert_one(doc)
+        doc["_id"] = result.inserted_id
+    return _invoice_to_response(doc)

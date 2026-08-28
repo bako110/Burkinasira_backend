@@ -1,250 +1,104 @@
-from fastapi import APIRouter, HTTPException, Query, Depends, status
-from typing import List
-from app.core.security import get_current_user, require_admin
-from app.core.permissions import Permission
-from app.schemas.auth import TokenPayload
+from typing import Optional
+from fastapi import APIRouter, Depends, Query, status
+from app.core.security import require_role
 from app.models.user import UserRole
-from app.schemas.story import StoryCreate, StoryUpdate, StoryResponse
-from app.services.story_service import StoryService
-import logging
+from app.models.story import CultureContentType
+from app.schemas.auth import TokenPayload
+from app.schemas.story import (
+    CreateCultureContentRequest,
+    UpdateCultureContentRequest,
+    CultureContentDetail,
+    CultureContentListResponse,
+    CreateCulturalRouteRequest,
+    UpdateCulturalRouteRequest,
+    CulturalRouteResponse,
+)
+from app.services import story_service
 
-logger = logging.getLogger(__name__)
-
-router = APIRouter(prefix="/stories", tags=["Visitor Stories"])
-story_service = StoryService()
+router = APIRouter(prefix="/culture", tags=["Culture, patrimoine et mémoire"])
 
 
-@router.post("/", response_model=dict, status_code=201)
-async def create_story(
-    story: StoryCreate,
-    current_user: TokenPayload = Depends(get_current_user)
+@router.get("/content", response_model=CultureContentListResponse)
+async def list_content(
+    type: Optional[CultureContentType] = None,
+    region: Optional[str] = None,
+    q: Optional[str] = Query(default=None, description="Recherche texte (titre, résumé)"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
 ):
-    """Créer une histoire de visiteur (TOURIST ONLY)"""
-    try:
-        Permission.check_tourist(current_user)
-        story_id = await story_service.create_story(story, current_user.sub)
-        return {"id": story_id, "message": "Histoire créée avec succès"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
+    """Histoire, patrimoine, traditions, contes, musique, guides audio/vidéo (§18)."""
+    return await story_service.list_content(type=type, region=region, q=q, page=page, page_size=page_size)
 
 
-@router.get("/", response_model=List[StoryResponse])
-async def list_stories(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
-    current_user: TokenPayload = Depends(get_current_user)
+@router.get("/content/{content_id}", response_model=CultureContentDetail)
+async def get_content(content_id: str):
+    """Détail d'un contenu culturel (texte, guide audio ou vidéo)."""
+    return await story_service.get_content(content_id)
+
+
+@router.post("/content", response_model=CultureContentDetail, status_code=status.HTTP_201_CREATED)
+async def create_content(
+    data: CreateCultureContentRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
-    """Récupérer les histoires publiées (authentifié requis)"""
-    try:
-        return await story_service.get_all_stories(skip, limit)
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
+    """(Admin) Publier un contenu culturel."""
+    return await story_service.create_content(data, created_by=current_user.sub)
 
 
-@router.get("/type/{traveler_type}", response_model=List[StoryResponse])
-async def get_by_traveler_type(
-    traveler_type: str,
-    current_user: TokenPayload = Depends(get_current_user)
+@router.patch("/content/{content_id}", response_model=CultureContentDetail)
+async def update_content(
+    content_id: str,
+    data: UpdateCultureContentRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
-    """Récupérer les histoires par type de voyageur (authentifié requis)"""
-    try:
-        return await story_service.get_stories_by_traveler_type(traveler_type)
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
+    """(Admin) Mettre à jour un contenu culturel."""
+    return await story_service.update_content(content_id, data)
 
 
-@router.get("/featured", response_model=List[StoryResponse])
-async def get_featured(current_user: TokenPayload = Depends(get_current_user)):
-    """Récupérer les histoires en avant (authentifié requis)"""
-    try:
-        return await story_service.get_featured_stories()
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
-
-
-@router.get("/emotional", response_model=List[StoryResponse])
-async def get_emotional(current_user: TokenPayload = Depends(get_current_user)):
-    """Récupérer les histoires les plus émouvantes (authentifié requis)"""
-    try:
-        return await story_service.get_most_emotional_stories()
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
-
-
-@router.get("/top-rated", response_model=List[StoryResponse])
-async def get_top_rated(current_user: TokenPayload = Depends(get_current_user)):
-    """Récupérer les histoires les mieux notées (authentifié requis)"""
-    try:
-        return await story_service.get_top_rated_stories()
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
-
-
-@router.get("/{story_id}", response_model=StoryResponse)
-async def get_one(
-    story_id: str,
-    current_user: TokenPayload = Depends(get_current_user)
+@router.delete("/content/{content_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_content(
+    content_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
 ):
-    """Récupérer une histoire (authentifié requis)"""
-    try:
-        story = await story_service.get_story(story_id)
-        if not story:
-            raise HTTPException(status_code=404, detail="Histoire non trouvée")
-        return story
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
+    """(Admin) Supprimer un contenu culturel."""
+    await story_service.delete_content(content_id)
 
 
-@router.put("/{story_id}")
-async def update_one(
-    story_id: str,
-    story: StoryUpdate,
-    current_user: TokenPayload = Depends(get_current_user)
+@router.get("/routes", response_model=list)
+async def list_routes(region: Optional[str] = None):
+    """Parcours culturels disponibles (§18)."""
+    return await story_service.list_routes(region)
+
+
+@router.get("/routes/{route_id}", response_model=CulturalRouteResponse)
+async def get_route(route_id: str):
+    """Suivre un parcours culturel : étapes lieux + contenus."""
+    return await story_service.get_route(route_id)
+
+
+@router.post("/routes", response_model=CulturalRouteResponse, status_code=status.HTTP_201_CREATED)
+async def create_route(
+    data: CreateCulturalRouteRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
-    """Mettre à jour une histoire (propriétaire, MODERATOR ou ADMIN)"""
-    try:
-        existing = await story_service.get_story(story_id)
-        if not existing:
-            raise HTTPException(status_code=404, detail="Histoire non trouvée")
-        
-        # Vérifier les permissions
-        if current_user.role not in [UserRole.MODERATOR, UserRole.ADMIN]:
-            if existing.get("author_id") != current_user.sub:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Vous ne pouvez modifier que vos propres histoires"
-                )
-        
-        success = await story_service.update_story(story_id, story)
-        if not success:
-            raise HTTPException(status_code=404, detail="Histoire non trouvée")
-        return {"message": "Histoire mise à jour"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
+    """(Admin) Créer un parcours culturel."""
+    return await story_service.create_route(data, created_by=current_user.sub)
 
 
-@router.post("/{story_id}/feature")
-async def feature_story(
-    story_id: str,
-    admin: TokenPayload = Depends(require_admin)
+@router.patch("/routes/{route_id}", response_model=CulturalRouteResponse)
+async def update_route(
+    route_id: str,
+    data: UpdateCulturalRouteRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
-    """Mettre en avant une histoire (ADMIN ONLY)"""
-    try:
-        success = await story_service.feature_story(story_id)
-        if not success:
-            raise HTTPException(status_code=404, detail="Histoire non trouvée")
-        return {"message": "Histoire mise en avant"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
+    """(Admin) Mettre à jour un parcours culturel."""
+    return await story_service.update_route(route_id, data)
 
 
-@router.delete("/{story_id}")
-async def delete_one(
-    story_id: str,
-    current_user: TokenPayload = Depends(get_current_user)
+@router.delete("/routes/{route_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_route(
+    route_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
 ):
-    """Supprimer une histoire (propriétaire, MODERATOR ou ADMIN)"""
-    try:
-        existing = await story_service.get_story(story_id)
-        if not existing:
-            raise HTTPException(status_code=404, detail="Histoire non trouvée")
-        
-        # Vérifier les permissions
-        if current_user.role not in [UserRole.MODERATOR, UserRole.ADMIN]:
-            if existing.get("author_id") != current_user.sub:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Vous ne pouvez supprimer que vos propres histoires"
-                )
-        
-        success = await story_service.delete_story(story_id)
-        if not success:
-            raise HTTPException(status_code=404, detail="Histoire non trouvée")
-        return {"message": "Histoire supprimée"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
-
-
-# ============ ADMIN GLOBAL VIEWS ============
-
-@router.get("/admin/all", response_model=List[StoryResponse])
-async def admin_get_all_stories(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
-    admin: TokenPayload = Depends(require_admin)
-):
-    """Vue globale de toutes les histoires pour l'admin"""
-    try:
-        from app.core.database import get_database
-        db = get_database()
-        stories = []
-        
-        cursor = db["stories"].find().skip(skip).limit(limit)
-        async for story in cursor:
-            story["_id"] = str(story["_id"])
-            stories.append(story)
-        
-        return stories
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
-
-
-@router.post("/admin/{story_id}/flag")
-async def flag_story(
-    story_id: str,
-    reason: str,
-    admin: TokenPayload = Depends(require_admin)
-):
-    """Signaler une histoire comme inappropriée (ADMIN)"""
-    try:
-        success = await story_service.flag_story(story_id, reason)
-        if not success:
-            raise HTTPException(status_code=404, detail="Histoire non trouvée")
-        return {"message": "Histoire signalée comme inappropriée"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
-
-
-@router.get("/admin/stats", response_model=dict)
-async def admin_get_stories_stats(admin: TokenPayload = Depends(require_admin)):
-    """Statistiques sur les histoires pour l'admin"""
-    try:
-        from app.core.database import get_database
-        db = get_database()
-        
-        total = await db["stories"].count_documents({})
-        featured = await db["stories"].count_documents({"featured": True})
-        flagged = await db["stories"].count_documents({"flagged": True})
-        
-        return {
-            "total_stories": total,
-            "featured_stories": featured,
-            "flagged_stories": flagged
-        }
-    except Exception as e:
-        logger.error(f"Erreur: {e}")
-        raise HTTPException(status_code=500, detail="Erreur serveur")
+    """(Admin) Supprimer un parcours culturel."""
+    await story_service.delete_route(route_id)

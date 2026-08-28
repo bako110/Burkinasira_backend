@@ -1,69 +1,80 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from enum import Enum
 from datetime import datetime
-from bson import ObjectId
+from typing import Optional, List
+from pydantic import BaseModel, Field
+
+
+class DestinationCategory(str, Enum):
+    SITE_NATUREL = "site_naturel"
+    SITE_HISTORIQUE = "site_historique"
+    SITE_CULTUREL = "site_culturel"
+    SITE_RELIGIEUX = "site_religieux"
+    MUSEE = "musee"
+    MONUMENT = "monument"
+    VILLAGE_TOURISTIQUE = "village_touristique"
+    MARCHE_ARTISANAL = "marche_artisanal"
+    PARC = "parc"
+    AUTRE = "autre"
+
+
+class DestinationStatus(str, Enum):
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"
+
+
+class GeoPoint(BaseModel):
+    latitude: float
+    longitude: float
+
+
+class OpeningHours(BaseModel):
+    day: str  # ex: "lundi"
+    open_time: Optional[str] = None  # ex: "08:00"
+    close_time: Optional[str] = None  # ex: "18:00"
+    closed: bool = False
+
+
+class Accessibility(BaseModel):
+    wheelchair_accessible: Optional[bool] = None
+    notes: Optional[str] = None
+
+
+class DataSource(BaseModel):
+    verified: bool = False
+    source: Optional[str] = None
+    last_updated_at: Optional[datetime] = None
 
 
 class Destination(BaseModel):
-    """Modèle pour les destinations touristiques du Burkina Faso"""
-    
-    id: Optional[str] = Field(None, alias="_id")
-    nom: str = Field(..., description="Nom de la destination")
-    description: str = Field(..., description="Description détaillée")
-    region: str = Field(..., description="Région du Burkina Faso")
-    province: str = Field(..., description="Province")
-    localite: str = Field(..., description="Localité/Commune")
-    
-    # Informations touristiques
-    type_destination: str = Field(
-        ..., 
-        description="Type: parc_national, musée, cascade, site_historique, etc."
-    )
-    categorie: List[str] = Field(default=[], description="Catégories: nature, culture, histoire, etc.")
-    
-    # Localisation
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    altitude: Optional[float] = None
-    
-    # Accès et facilités
-    temps_acces_heures: Optional[float] = Field(None, description="Temps d'accès depuis la capitale en heures")
-    meilleure_saison: List[str] = Field(default=[], description="Meilleures saisons pour visiter")
-    acces_securise: bool = Field(True, description="L'accès est-il sécurisé?")
-    
-    # Tarifs
-    tarif_entree_fcfa: Optional[float] = Field(None, description="Tarif d'entrée en FCFA")
-    tarif_guide_fcfa: Optional[float] = Field(None, description="Tarif du guide en FCFA")
-    
-    # Images et médias
-    image: Optional[str] = Field(None, description="URL de l'image principale")
-    images: List[str] = Field(default=[], description="URLs des images supplémentaires")
-    video_url: Optional[str] = Field(None, description="URL d'une vidéo")
-    
-    # Évaluations
-    note_moyenne: float = Field(default=0, ge=0, le=5)
-    nombre_evaluations: int = Field(default=0)
-    
-    # Métadonnées
-    publie: bool = Field(True, description="La destination est-elle publiée?")
-    date_creation: datetime = Field(default_factory=datetime.utcnow)
-    date_modification: datetime = Field(default_factory=datetime.utcnow)
-    
+    id: Optional[str] = Field(default=None, alias="_id")
+    name: str
+    slug: str
+    description: str
+    category: DestinationCategory
+    region: str
+    province: Optional[str] = None
+    city: Optional[str] = None
+    location: GeoPoint
+    address: Optional[str] = None
+    photos: List[str] = []
+    videos: List[str] = []
+    opening_hours: List[OpeningHours] = []
+    price_info: Optional[str] = None
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
+    booking_url: Optional[str] = None
+    services_on_site: List[str] = []
+    accessibility: Accessibility = Accessibility()
+    history: Optional[str] = None
+    average_rating: float = 0.0
+    review_count: int = 0
+    status: DestinationStatus = DestinationStatus.PUBLISHED
+    data_source: DataSource = DataSource()
+    created_by: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
     class Config:
         populate_by_name = True
-        json_schema_extra = {
-            "example": {
-                "nom": "Cascade de Banfora",
-                "description": "Spectaculaire cascade dans la région boucle du Mouhoun",
-                "region": "Hauts-Bassins",
-                "province": "Cascades",
-                "localite": "Banfora",
-                "type_destination": "cascade",
-                "categorie": ["nature", "randonnée"],
-                "latitude": 10.6347,
-                "longitude": -4.7596,
-                "meilleure_saison": ["septembre", "octobre", "novembre"],
-                "acces_securise": True,
-                "tarif_entree_fcfa": 2000.0
-            }
-        }
+        use_enum_values = True

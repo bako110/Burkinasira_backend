@@ -1,115 +1,193 @@
-from typing import List, Dict, Any
 from datetime import datetime
-from bson.objectid import ObjectId
-from app.models.roads import RoadCondition
-from app.schemas.roads import RoadCreate, RoadUpdate
+from math import radians, cos, sin, asin, sqrt
+from typing import Optional
+from bson import ObjectId
+from fastapi import HTTPException, status
 from app.core.database import get_database
+from app.models.roads import RoadServiceType, RoadServiceStatus, BreakdownReportStatus
+from app.schemas.roads import (
+    CreateRoadServiceRequest,
+    UpdateRoadServiceRequest,
+    RoadServiceSummary,
+    RoadServiceDetail,
+    RoadServiceListResponse,
+    ReportBreakdownRequest,
+    BreakdownReportResponse,
+)
+
+COLLECTION = "road_services"
+BREAKDOWNS_COLLECTION = "breakdown_reports"
 
 
-class RoadService:
-    
-    def __init__(self):
-        self.collection_name = "road_conditions"
+def _haversine_km(lat1, lon1, lat2, lon2) -> float:
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+    return 6371 * 2 * asin(sqrt(a))
 
-    async def create_condition(self, condition: RoadCreate) -> str:
-        """Créer un report sur l'état d'une route"""
-        db = get_database()
-        condition_dict = condition.model_dump()
-        condition_dict["date_creation"] = datetime.utcnow()
-        condition_dict["date_modification"] = datetime.utcnow()
-        result = await db[self.collection_name].insert_one(condition_dict)
-        return str(result.inserted_id)
 
-    async def get_condition(self, condition_id: str) -> Dict[str, Any] | None:
-        """Récupérer un report routier"""
-        db = get_database()
-        try:
-            obj_id = ObjectId(condition_id)
-            condition = await db[self.collection_name].find_one({"_id": obj_id})
-            if condition:
-                condition["_id"] = str(condition["_id"])
-            return condition
-        except:
-            return None
+def _to_summary(doc: dict) -> RoadServiceSummary:
+    return RoadServiceSummary(
+        id=str(doc["_id"]),
+        name=doc["name"],
+        type=doc["type"],
+        region=doc["region"],
+        city=doc.get("city"),
+        location=doc["location"],
+        offers_24h=doc.get("offers_24h", False),
+        contact_phone=doc.get("contact_phone"),
+    )
 
-    async def get_all_conditions(self, skip: int = 0, limit: int = 50) -> List[Dict[str, Any]]:
-        """Récupérer tous les rapports routiers"""
-        db = get_database()
-        conditions = await db[self.collection_name].find({}).skip(skip).limit(limit).to_list(limit)
-        return [{**c, "_id": str(c["_id"])} for c in conditions]
 
-    async def update_condition(self, condition_id: str, condition: RoadUpdate) -> bool:
-        """Mettre à jour un report"""
-        db = get_database()
-        try:
-            obj_id = ObjectId(condition_id)
-            update_dict = condition.model_dump(exclude_unset=True)
-            update_dict["date_modification"] = datetime.utcnow()
-            result = await db[self.collection_name].update_one(
-                {"_id": obj_id},
-                {"$set": update_dict}
-            )
-            return result.modified_count > 0
-        except:
-            return False
+def _to_detail(doc: dict) -> RoadServiceDetail:
+    return RoadServiceDetail(
+        id=str(doc["_id"]),
+        name=doc["name"],
+        type=doc["type"],
+        description=doc.get("description"),
+        region=doc["region"],
+        city=doc.get("city"),
+        location=doc["location"],
+        address=doc.get("address"),
+        opening_hours=doc.get("opening_hours", []),
+        offers_24h=doc.get("offers_24h", False),
+        contact_phone=doc.get("contact_phone"),
+        data_source=doc.get("data_source", {}),
+        created_at=doc["created_at"],
+        updated_at=doc["updated_at"],
+    )
 
-    async def delete_condition(self, condition_id: str) -> bool:
-        """Supprimer un report"""
-        db = get_database()
-        try:
-            obj_id = ObjectId(condition_id)
-            result = await db[self.collection_name].delete_one({"_id": obj_id})
-            return result.deleted_count > 0
-        except:
-            return False
 
-    async def get_dangerous_routes(self) -> List[Dict[str, Any]]:
-        """Récupérer les ROUTES DANGEREUSES"""
-        db = get_database()
-        conditions = await db[self.collection_name].find({
-            "note_securite": {"$lte": 3}
-        }).sort("note_securite", 1).to_list(None)
-        return [{**c, "_id": str(c["_id"])} for c in conditions]
+async def create_road_service(data: CreateRoadServiceRequest) -> RoadServiceDetail:
+    db = get_database()
+    now = datetime.utcnow()
+    doc = data.model_dump()
+    doc["status"] = RoadServiceStatus.PUBLISHED.value
+    doc["data_source"] = {"verified": False, "source": None, "last_updated_at": now}
+    doc["created_at"] = now
+    doc["updated_at"] = now
+    result = await db[COLLECTION].insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return _to_detail(doc)
 
-    async def get_routes_by_from_to(self, from_city: str, to_city: str) -> List[Dict[str, Any]]:
-        """Récupérer les conditions entre deux villes"""
-        db = get_database()
-        conditions = await db[self.collection_name].find({
-            "$or": [
-                {"ville_depart": from_city, "ville_arrivee": to_city},
-                {"ville_depart": to_city, "ville_arrivee": from_city}
+
+async def list_road_services(
+    type: Optional[RoadServiceType] = None,
+    region: Optional[str] = None,
+    near_lat: Optional[float] = None,
+    near_lng: Optional[float] = None,
+    radius_km: Optional[float] = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> RoadServiceListResponse:
+    db = get_database()
+    query: dict = {"status": RoadServiceStatus.PUBLISHED.value}
+    if type:
+        query["type"] = type.value if isinstance(type, RoadServiceType) else type
+    if region:
+        query["region"] = region
+
+    all_docs = await db[COLLECTION].find(query).to_list(length=None)
+
+    if near_lat is not None and near_lng is not None:
+        all_docs.sort(
+            key=lambda d: _haversine_km(near_lat, near_lng, d["location"]["latitude"], d["location"]["longitude"])
+        )
+        if radius_km is not None:
+            all_docs = [
+                d for d in all_docs
+                if _haversine_km(near_lat, near_lng, d["location"]["latitude"], d["location"]["longitude"]) <= radius_km
             ]
-        }).to_list(None)
-        return [{**c, "_id": str(c["_id"])} for c in conditions]
 
-    async def get_routes_with_accidents(self) -> List[Dict[str, Any]]:
-        """Récupérer les routes avec historique d'accidents"""
-        db = get_database()
-        conditions = await db[self.collection_name].find({
-            "frequence_accidents": {"$gte": 5}
-        }).sort("frequence_accidents", -1).to_list(None)
-        return [{**c, "_id": str(c["_id"])} for c in conditions]
+    total = len(all_docs)
+    start = (page - 1) * page_size
+    page_docs = all_docs[start:start + page_size]
 
-    async def get_banditry_risks_by_hour(self, heure: int) -> List[Dict[str, Any]]:
-        """Récupérer les risques de banditisme pour une heure spécifique"""
-        db = get_database()
-        conditions = await db[self.collection_name].find({
-            "heures_risque_banditisme": heure
-        }).to_list(None)
-        return [{**c, "_id": str(c["_id"])} for c in conditions]
+    return RoadServiceListResponse(
+        items=[_to_summary(d) for d in page_docs],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
-    async def get_best_safe_routes(self) -> List[Dict[str, Any]]:
-        """Récupérer les meilleures routes sûres"""
-        db = get_database()
-        conditions = await db[self.collection_name].find({
-            "note_securite": {"$gte": 4}
-        }).sort("note_securite", -1).to_list(None)
-        return [{**c, "_id": str(c["_id"])} for c in conditions]
 
-    async def get_routes_by_surface_type(self, surface_type: str) -> List[Dict[str, Any]]:
-        """Récupérer les routes par type de surface"""
-        db = get_database()
-        conditions = await db[self.collection_name].find({
-            "type_surface": surface_type
-        }).to_list(None)
-        return [{**c, "_id": str(c["_id"])} for c in conditions]
+async def get_road_service(service_id: str) -> RoadServiceDetail:
+    db = get_database()
+    if not ObjectId.is_valid(service_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service introuvable")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(service_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service introuvable")
+    return _to_detail(doc)
+
+
+async def update_road_service(service_id: str, data: UpdateRoadServiceRequest) -> RoadServiceDetail:
+    db = get_database()
+    if not ObjectId.is_valid(service_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service introuvable")
+    update_fields = data.model_dump(exclude_unset=True, exclude_none=True)
+    if update_fields:
+        update_fields["updated_at"] = datetime.utcnow()
+        result = await db[COLLECTION].update_one({"_id": ObjectId(service_id)}, {"$set": update_fields})
+        if result.matched_count == 0:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service introuvable")
+    return await get_road_service(service_id)
+
+
+async def delete_road_service(service_id: str) -> None:
+    db = get_database()
+    if not ObjectId.is_valid(service_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service introuvable")
+    result = await db[COLLECTION].delete_one({"_id": ObjectId(service_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service introuvable")
+
+
+# --- Signalement de panne ---
+
+def _breakdown_to_response(doc: dict) -> BreakdownReportResponse:
+    return BreakdownReportResponse(
+        id=str(doc["_id"]),
+        reporter_id=doc["reporter_id"],
+        location=doc["location"],
+        description=doc.get("description"),
+        assigned_service_id=doc.get("assigned_service_id"),
+        status=doc.get("status", BreakdownReportStatus.OPEN.value),
+        created_at=doc["created_at"],
+    )
+
+
+async def report_breakdown(data: ReportBreakdownRequest, reporter_id: str) -> BreakdownReportResponse:
+    db = get_database()
+    now = datetime.utcnow()
+    doc = data.model_dump()
+    doc["reporter_id"] = reporter_id
+    doc["assigned_service_id"] = None
+    doc["status"] = BreakdownReportStatus.OPEN.value
+    doc["created_at"] = now
+    doc["updated_at"] = now
+    result = await db[BREAKDOWNS_COLLECTION].insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return _breakdown_to_response(doc)
+
+
+async def list_my_breakdowns(reporter_id: str) -> list:
+    db = get_database()
+    docs = await db[BREAKDOWNS_COLLECTION].find({"reporter_id": reporter_id}).sort("created_at", -1).to_list(length=None)
+    return [_breakdown_to_response(d) for d in docs]
+
+
+async def assign_breakdown(report_id: str, service_id: str) -> BreakdownReportResponse:
+    await get_road_service(service_id)  # 404 si inexistant
+    db = get_database()
+    if not ObjectId.is_valid(report_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signalement introuvable")
+    result = await db[BREAKDOWNS_COLLECTION].update_one(
+        {"_id": ObjectId(report_id)},
+        {"$set": {"assigned_service_id": service_id, "status": BreakdownReportStatus.ASSIGNED.value, "updated_at": datetime.utcnow()}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signalement introuvable")
+    doc = await db[BREAKDOWNS_COLLECTION].find_one({"_id": ObjectId(report_id)})
+    return _breakdown_to_response(doc)

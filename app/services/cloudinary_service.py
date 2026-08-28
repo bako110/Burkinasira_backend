@@ -1,132 +1,55 @@
-"""
-Service pour gérer les uploads d'images vers Cloudinary
-"""
 import cloudinary
 import cloudinary.uploader
+from fastapi import HTTPException, UploadFile, status
 from app.core.config import settings
-import logging
-from typing import Optional, Dict
 
-logger = logging.getLogger(__name__)
-
-# Configuration Cloudinary
 cloudinary.config(
     cloud_name=settings.CLOUDINARY_CLOUD_NAME,
     api_key=settings.CLOUDINARY_API_KEY,
     api_secret=settings.CLOUDINARY_API_SECRET,
-    secure=True
+    secure=True,
 )
 
-class CloudinaryService:
-    """Service pour gérer les uploads d'images"""
-    
-    @staticmethod
-    async def upload_image(
-        file_content: bytes,
-        folder: str = "guides",
-        public_id: Optional[str] = None,
-        transformation: Optional[Dict] = None
-    ) -> Dict:
-        """
-        Upload une image vers Cloudinary
-        
-        Args:
-            file_content: Contenu du fichier en bytes
-            folder: Dossier dans Cloudinary (ex: 'guides', 'destinations')
-            public_id: ID public optionnel pour l'image
-            transformation: Transformations à appliquer (resize, crop, etc.)
-            
-        Returns:
-            Dict avec url, secure_url, public_id, etc.
-        """
-        try:
-            upload_options = {
-                "folder": folder,
-                "resource_type": "image",
-                "overwrite": True,
-            }
-            
-            if public_id:
-                upload_options["public_id"] = public_id
-            
-            if transformation:
-                upload_options["transformation"] = transformation
-            else:
-                # Transformation par défaut pour les photos de profil
-                upload_options["transformation"] = [
-                    {"width": 500, "height": 500, "crop": "fill", "gravity": "face"},
-                    {"quality": "auto"},
-                    {"fetch_format": "auto"}
-                ]
-            
-            result = cloudinary.uploader.upload(
-                file_content,
-                **upload_options
-            )
-            
-            logger.info(f"Image uploaded successfully: {result.get('secure_url')}")
-            return {
-                "url": result.get("url"),
-                "secure_url": result.get("secure_url"),
-                "public_id": result.get("public_id"),
-                "width": result.get("width"),
-                "height": result.get("height"),
-                "format": result.get("format"),
-                "resource_type": result.get("resource_type"),
-            }
-        except Exception as e:
-            logger.error(f"Erreur lors de l'upload Cloudinary: {e}")
-            raise Exception(f"Erreur lors de l'upload de l'image: {str(e)}")
-    
-    @staticmethod
-    async def delete_image(public_id: str) -> bool:
-        """
-        Supprimer une image de Cloudinary
-        
-        Args:
-            public_id: L'ID public de l'image à supprimer
-            
-        Returns:
-            True si suppression réussie
-        """
-        try:
-            result = cloudinary.uploader.destroy(public_id)
-            logger.info(f"Image deleted: {public_id}")
-            return result.get("result") == "ok"
-        except Exception as e:
-            logger.error(f"Erreur lors de la suppression Cloudinary: {e}")
-            return False
-    
-    @staticmethod
-    def get_optimized_url(
-        public_id: str,
-        width: int = 500,
-        height: int = 500,
-        crop: str = "fill"
-    ) -> str:
-        """
-        Générer une URL optimisée pour une image existante
-        
-        Args:
-            public_id: L'ID public de l'image
-            width: Largeur souhaitée
-            height: Hauteur souhaitée
-            crop: Mode de crop ('fill', 'fit', 'scale', etc.)
-            
-        Returns:
-            URL de l'image optimisée
-        """
-        try:
-            url = cloudinary.CloudinaryImage(public_id).build_url(
-                width=width,
-                height=height,
-                crop=crop,
-                quality="auto",
-                fetch_format="auto"
-            )
-            return url
-        except Exception as e:
-            logger.error(f"Erreur génération URL optimisée: {e}")
-            return ""
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+ALLOWED_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/webm"}
+MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024  # 15 Mo
 
-cloudinary_service = CloudinaryService()
+
+async def upload_media(file: UploadFile, folder: str = "gotours") -> dict:
+    """Téléverse une image ou une vidéo vers Cloudinary et retourne son URL publique."""
+    content_type = file.content_type or ""
+    is_image = content_type in ALLOWED_IMAGE_TYPES
+    is_video = content_type in ALLOWED_VIDEO_TYPES
+
+    if not is_image and not is_video:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Format de fichier non supporté (images JPEG/PNG/WEBP/GIF ou vidéos MP4/MOV/WEBM uniquement)",
+        )
+
+    contents = await file.read()
+    if len(contents) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Le fichier dépasse la taille maximale autorisée (15 Mo)",
+        )
+
+    try:
+        result = cloudinary.uploader.upload(
+            contents,
+            folder=folder,
+            resource_type="video" if is_video else "image",
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Échec de l'envoi du fichier au service de stockage",
+        ) from exc
+
+    return {
+        "url": result.get("secure_url"),
+        "resource_type": result.get("resource_type"),
+        "width": result.get("width"),
+        "height": result.get("height"),
+        "duration": result.get("duration"),
+    }

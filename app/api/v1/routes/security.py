@@ -1,89 +1,79 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import List
-from app.schemas.security import SecurityCreate, SecurityUpdate, SecurityResponse
-from app.services.security_service import SecurityService
+from typing import Optional
+from fastapi import APIRouter, Depends, status
+from app.core.security import get_current_user, get_current_user_optional, require_role
+from app.models.user import UserRole
+from app.models.emergency import IncidentStatus
+from app.schemas.auth import TokenPayload
+from app.schemas.emergency import (
+    ReportIncidentRequest,
+    IncidentReportResponse,
+    ModerateIncidentRequest,
+    CreateSecurityAlertRequest,
+    UpdateSecurityAlertRequest,
+    SecurityAlertResponse,
+)
+from app.services import emergency_service
 
-router = APIRouter(prefix="/security-alerts", tags=["Security Alerts"])
-security_service = SecurityService()
-
-
-@router.post("/", response_model=dict, status_code=201)
-async def create_alert(alert: SecurityCreate):
-    """Créer une alerte de sécurité (CRITIQUE)"""
-    alert_id = await security_service.create_alert(alert)
-    return {"id": alert_id, "message": "Alert created - Awaiting verification"}
-
-
-@router.get("/", response_model=List[SecurityResponse])
-async def list_alerts(skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100)):
-    """Récupérer toutes les alertes"""
-    return await security_service.get_all_alerts(skip, limit)
+router = APIRouter(prefix="/security-alerts", tags=["Urgences et sécurité"])
 
 
-@router.get("/active", response_model=List[SecurityResponse])
-async def get_active_alerts():
-    """Récupérer les alertes ACTIVES (temps réel)"""
-    return await security_service.get_active_alerts()
+@router.get("", response_model=list)
+async def list_active_alerts(region: Optional[str] = None):
+    """Alertes officielles géolocalisées sur zones/routes à risque (§10)."""
+    return await emergency_service.list_active_alerts(region)
 
 
-@router.get("/high-risk", response_model=List[SecurityResponse])
-async def get_high_risk_alerts():
-    """Récupérer les alertes à HAUT RISQUE"""
-    return await security_service.get_high_risk_alerts()
+@router.post("", response_model=SecurityAlertResponse, status_code=status.HTTP_201_CREATED)
+async def create_alert(
+    data: CreateSecurityAlertRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
+):
+    """(Admin) Publier une alerte de sécurité."""
+    return await emergency_service.create_alert(data, published_by=current_user.sub)
 
 
-@router.get("/region/{region}", response_model=List[SecurityResponse])
-async def get_by_region(region: str):
-    """Récupérer les alertes d'une région"""
-    return await security_service.get_alerts_by_region(region)
+@router.post("/incidents", response_model=IncidentReportResponse, status_code=status.HTTP_201_CREATED)
+async def report_incident(
+    data: ReportIncidentRequest,
+    current_user: Optional[TokenPayload] = Depends(get_current_user_optional),
+):
+    """Signaler un incident (avec modération a posteriori) (§10)."""
+    return await emergency_service.report_incident(data, reporter_id=current_user.sub if current_user else None)
 
 
-@router.get("/reliable-sources", response_model=List[SecurityResponse])
-async def get_reliable_sources(min_score: float = Query(0.7, ge=0, le=1)):
-    """Récupérer les alertes de sources fiables"""
-    return await security_service.get_alerts_by_source_reliability(min_score)
+@router.get("/incidents", response_model=list)
+async def list_incidents(
+    status_filter: Optional[IncidentStatus] = None,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
+):
+    """(Admin/Modérateur) Historique des incidents signalés."""
+    return await emergency_service.list_incidents(status_filter)
 
 
-@router.get("/{alert_id}", response_model=SecurityResponse)
-async def get_alert(alert_id: str):
-    """Récupérer une alerte"""
-    alert = await security_service.get_alert(alert_id)
-    if not alert:
-        raise HTTPException(status_code=404, detail="Alert not found")
-    return alert
+@router.patch("/incidents/{incident_id}", response_model=IncidentReportResponse)
+async def moderate_incident(
+    incident_id: str,
+    data: ModerateIncidentRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
+):
+    """(Admin/Modérateur) Modérer un signalement d'incident."""
+    return await emergency_service.moderate_incident(incident_id, data, moderator_id=current_user.sub)
 
 
-@router.put("/{alert_id}")
-async def update_alert(alert_id: str, alert: SecurityUpdate):
-    """Mettre à jour une alerte"""
-    success = await security_service.update_alert(alert_id, alert)
-    if not success:
-        raise HTTPException(status_code=404, detail="Alert not found")
-    return {"message": "Alert updated"}
+@router.patch("/{alert_id}", response_model=SecurityAlertResponse)
+async def update_alert(
+    alert_id: str,
+    data: UpdateSecurityAlertRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
+):
+    """(Admin) Mettre à jour une alerte de sécurité."""
+    return await emergency_service.update_alert(alert_id, data)
 
 
-@router.post("/{alert_id}/verify")
-async def verify_alert(alert_id: str, verified_by: str = Query(...)):
-    """Vérifier une alerte (ADMIN - MODÉRATION CRITIQUE)"""
-    success = await security_service.verify_alert(alert_id, verified_by)
-    if not success:
-        raise HTTPException(status_code=404, detail="Alert not found")
-    return {"message": "Alert verified and published"}
-
-
-@router.post("/{alert_id}/deactivate")
-async def deactivate_alert(alert_id: str, raison: str = Query(...)):
-    """Désactiver une alerte (situation résolue)"""
-    success = await security_service.deactivate_alert(alert_id, raison)
-    if not success:
-        raise HTTPException(status_code=404, detail="Alert not found")
-    return {"message": "Alert deactivated"}
-
-
-@router.delete("/{alert_id}")
-async def delete_alert(alert_id: str):
-    """Supprimer une alerte"""
-    success = await security_service.delete_alert(alert_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Alert not found")
-    return {"message": "Alert deleted"}
+@router.delete("/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_alert(
+    alert_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Supprimer une alerte de sécurité."""
+    await emergency_service.delete_alert(alert_id)

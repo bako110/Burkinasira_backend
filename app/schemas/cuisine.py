@@ -1,55 +1,94 @@
-from pydantic import BaseModel
-from typing import Optional, List
 from datetime import datetime
+from typing import Optional, List
+from pydantic import BaseModel, Field
+from app.models.destination import GeoPoint, DataSource, OpeningHours
+from app.models.cuisine import EstablishmentType, DietaryTag, MenuItem, CuisineStatus
 
 
-class CuisineCreate(BaseModel):
-    """Schéma pour créer un restaurant local"""
-    nom: str
-    description: str
-    type_restaurant: str
-    ville: str
+class CreateRestaurantRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=150)
+    type: EstablishmentType
+    description: str = Field(..., min_length=10)
+    cuisine_style: Optional[str] = None
     region: str
-    province: str
-    localite: str
-    adresse: str
-    specialites: List[str]
-    cuisine_type: str
-    budget_moyen_fcfa: float
-    proprietaire_nom: str
-    utilise_produits_locaux: bool = True
-    visite_atelier_possible: bool = True
-    employes_locaux: int = 0
-    apprentissage_jeunes: bool = False
+    city: Optional[str] = None
+    location: GeoPoint
+    address: Optional[str] = None
+    photos: List[str] = []
+    opening_hours: List[OpeningHours] = []
+    menu: List[MenuItem] = []
+    dietary_tags: List[DietaryTag] = []
+    accepts_table_booking: bool = True
+    offers_takeaway: bool = False
+    offers_cooking_workshop: bool = False
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
 
 
-class CuisineUpdate(BaseModel):
-    """Schéma pour mettre à jour un restaurant"""
-    nom: Optional[str] = None
+class UpdateRestaurantRequest(BaseModel):
+    name: Optional[str] = None
+    type: Optional[EstablishmentType] = None
     description: Optional[str] = None
-    type_restaurant: Optional[str] = None
-    specialites: Optional[List[str]] = None
-    cuisine_type: Optional[str] = None
-    budget_moyen_fcfa: Optional[float] = None
-    proprietaire_nom: Optional[str] = None
-    utilise_produits_locaux: Optional[bool] = None
-    employes_locaux: Optional[int] = None
-    apprentissage_jeunes: Optional[bool] = None
+    cuisine_style: Optional[str] = None
+    region: Optional[str] = None
+    city: Optional[str] = None
+    location: Optional[GeoPoint] = None
+    address: Optional[str] = None
+    photos: Optional[List[str]] = None
+    opening_hours: Optional[List[OpeningHours]] = None
+    menu: Optional[List[MenuItem]] = None
+    dietary_tags: Optional[List[DietaryTag]] = None
+    accepts_table_booking: Optional[bool] = None
+    offers_takeaway: Optional[bool] = None
+    offers_cooking_workshop: Optional[bool] = None
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
+    status: Optional[CuisineStatus] = None
 
 
-class CuisineResponse(BaseModel):
-    """Schéma de réponse pour un restaurant"""
-    id: Optional[str] = None
-    nom: str
-    type_restaurant: str
-    ville: str
-    specialites: List[str]
-    cuisine_type: str
-    budget_moyen_fcfa: float
-    proprietaire_nom: str
-    utilise_produits_locaux: bool
-    note_moyenne: float
-    plat_populaire: Optional[str]
-    
-    class Config:
-        populate_by_name = True
+class RestaurantSummary(BaseModel):
+    id: str
+    name: str
+    type: EstablishmentType
+    cuisine_style: Optional[str] = None
+    region: str
+    city: Optional[str] = None
+    photo: Optional[str] = None
+    dietary_tags: List[DietaryTag]
+    average_rating: float
+    review_count: int
+
+
+class RestaurantDetail(BaseModel):
+    id: str
+    owner_id: str
+    name: str
+    type: EstablishmentType
+    description: str
+    cuisine_style: Optional[str] = None
+    region: str
+    city: Optional[str] = None
+    location: GeoPoint
+    address: Optional[str] = None
+    photos: List[str]
+    opening_hours: List[OpeningHours]
+    menu: List[MenuItem]
+    dietary_tags: List[DietaryTag]
+    accepts_table_booking: bool
+    offers_takeaway: bool
+    offers_cooking_workshop: bool
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
+    average_rating: float
+    review_count: int
+    is_verified: bool
+    data_source: DataSource
+    created_at: datetime
+    updated_at: datetime
+
+
+class RestaurantListResponse(BaseModel):
+    items: List[RestaurantSummary]
+    total: int
+    page: int
+    page_size: int
