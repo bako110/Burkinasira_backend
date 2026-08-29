@@ -18,6 +18,7 @@ class BookingResponse(BaseModel):
     id: str
     booking_reference: str
     customer_id: str
+    provider_id: Optional[str] = None
     item_type: BookingItemType
     item_id: str
     item_title: str

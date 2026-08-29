@@ -3,7 +3,9 @@ from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, status
 from app.core.database import get_database
+from app.core.realtime import manager
 from app.models.messaging import ConversationKind
+from app.models.notification import NotificationCategory
 from app.schemas.messaging import (
     StartConversationRequest,
     SendChatMessageRequest,
@@ -11,6 +13,8 @@ from app.schemas.messaging import (
     ConversationResponse,
     ContactSupportRequest,
 )
+from app.schemas.notification import CreateNotificationRequest
+from app.services import notification_service
 
 CONVERSATIONS_COLLECTION = "conversations"
 MESSAGES_COLLECTION = "chat_messages"
@@ -63,10 +67,25 @@ async def _create_message(conversation_id: str, sender_id: str, content: Optiona
     msg_doc["_id"] = result.inserted_id
 
     preview = content[:80] if content else "[pièce jointe]"
-    await db[CONVERSATIONS_COLLECTION].update_one(
+    conversation = await db[CONVERSATIONS_COLLECTION].find_one_and_update(
         {"_id": ObjectId(conversation_id)},
         {"$set": {"last_message_preview": preview, "last_message_at": now}},
+        return_document=True,
     )
+
+    message_response = _message_to_response(msg_doc)
+    recipients = [p for p in (conversation or {}).get("participant_ids", []) if p != sender_id and p != SUPPORT_USER_ID]
+    for recipient_id in recipients:
+        await manager.send_to_user(recipient_id, "message.new", message_response.model_dump())
+        if not manager.is_online(recipient_id):
+            await notification_service.create_notification(CreateNotificationRequest(
+                user_id=recipient_id,
+                category=NotificationCategory.MESSAGE_PRESTATAIRE,
+                title="Nouveau message",
+                body=preview,
+                related_id=conversation_id,
+            ))
+
     return msg_doc
 
 

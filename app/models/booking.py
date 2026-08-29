@@ -28,6 +28,7 @@ class Booking(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id")
     booking_reference: str  # code court lisible, ex: "GT-2026-000123"
     customer_id: str
+    provider_id: Optional[str] = None  # user_id du prestataire (résolu à la création)
     item_type: BookingItemType
     item_id: str
     item_title: str

@@ -13,7 +13,7 @@ from app.api.v1.routes import (
     passport, business, edu, diaspora, international, bookings, messaging,
     pro_workspace, operators, verified, impact, revenue_split,
     payment_security, notifications, offline, admin, data_quality, analytics,
-    integrations, privacy, home, media, reviews,
+    integrations, privacy, home, media, reviews, ws,
 )
 import logging
 
@@ -309,6 +309,11 @@ app.include_router(media.router, prefix=settings.API_V1_PREFIX)
 # ROUTES AVIS CLIENTS (§37 GoTours Verified)
 # ============================================
 app.include_router(reviews.router, prefix=settings.API_V1_PREFIX)
+
+# ============================================
+# CANAL TEMPS RÉEL (messagerie + notifications)
+# ============================================
+app.include_router(ws.router)
 
 # Les 47 domaines fonctionnels du cahier GoTours (§2 à §47) sont désormais
 # tous reconstruits et câblés.

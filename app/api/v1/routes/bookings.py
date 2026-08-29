@@ -50,8 +50,10 @@ async def confirm_booking(
     booking_id: str,
     current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.PROVIDER, UserRole.GUIDE)),
 ):
-    """(Admin/Provider/Guide) Confirmer une réservation."""
-    return await booking_service.confirm_booking(booking_id)
+    """(Admin, ou le prestataire propriétaire de l'item) Confirmer une réservation."""
+    return await booking_service.confirm_booking(
+        booking_id, current_user.sub, is_admin=current_user.role == UserRole.ADMIN
+    )
 
 
 @router.post("/{booking_id}/cancel", response_model=BookingResponse)

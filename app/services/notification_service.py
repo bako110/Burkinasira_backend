@@ -3,6 +3,7 @@ from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, status
 from app.core.database import get_database
+from app.core.realtime import manager
 from app.models.notification import NotificationCategory
 from app.schemas.notification import (
     CreateNotificationRequest,
@@ -48,7 +49,10 @@ async def create_notification(data: CreateNotificationRequest) -> Optional[Notif
     doc["created_at"] = datetime.utcnow()
     result = await db[NOTIFICATIONS_COLLECTION].insert_one(doc)
     doc["_id"] = result.inserted_id
-    return _to_response(doc)
+    response = _to_response(doc)
+
+    await manager.send_to_user(data.user_id, "notification.new", response.model_dump())
+    return response
 
 
 async def list_my_notifications(user_id: str, unread_only: bool = False) -> list:
