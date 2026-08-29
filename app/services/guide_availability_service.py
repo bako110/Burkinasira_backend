@@ -1,9 +1,14 @@
 from bson import ObjectId
 from fastapi import HTTPException, status
 from app.core.database import get_database
+from app.models.messaging import ConversationKind
 from app.schemas.guide import AvailabilitySlotRequest, AvailabilitySlotResponse
+from app.schemas.messaging import StartConversationRequest, SendChatMessageRequest, ConversationResponse
+from app.services import guide_service
+from app.services import messaging_service
 
 COLLECTION = "guide_availability_slots"
+CONVERSATIONS_COLLECTION = "conversations"
 
 
 def _to_response(doc: dict) -> AvailabilitySlotResponse:
@@ -55,6 +60,48 @@ async def delete_slot(slot_id: str, guide_id: str) -> None:
     if doc.get("is_booked"):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ce créneau est déjà réservé")
     await db[COLLECTION].delete_one({"_id": ObjectId(slot_id)})
+
+
+async def contact_guide_about_slot(slot_id: str, tourist_id: str) -> ConversationResponse:
+    """Le touriste choisit un créneau et démarre (ou reprend) une conversation
+    avec le guide à ce sujet, sans créer de réservation."""
+    db = get_database()
+    if not ObjectId.is_valid(slot_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Créneau introuvable")
+    slot = await db[COLLECTION].find_one({"_id": ObjectId(slot_id)})
+    if not slot:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Créneau introuvable")
+    if slot.get("is_booked"):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ce créneau est déjà réservé")
+
+    guide = await guide_service.get_guide(slot["guide_id"])
+
+    existing = await db[CONVERSATIONS_COLLECTION].find_one({
+        "kind": ConversationKind.TOURISTE_GUIDE.value,
+        "participant_ids": {"$all": [tourist_id, guide.user_id]},
+    })
+    message = (
+        f"Bonjour, je suis intéressé(e) par le créneau du {slot['date']} "
+        f"de {slot['start_time']} à {slot['end_time']} avec {guide.display_name}. "
+        "Est-il toujours disponible ?"
+    )
+    if existing:
+        conversation_id = str(existing["_id"])
+        await messaging_service.send_message(
+            conversation_id,
+            SendChatMessageRequest(content=message),
+            sender_id=tourist_id,
+        )
+        return await messaging_service.get_conversation(conversation_id, tourist_id)
+
+    return await messaging_service.start_conversation(
+        StartConversationRequest(
+            kind=ConversationKind.TOURISTE_GUIDE,
+            other_user_id=guide.user_id,
+            initial_message=message,
+        ),
+        initiator_id=tourist_id,
+    )
 
 
 async def mark_slot_booked(slot_id: str) -> AvailabilitySlotResponse:
