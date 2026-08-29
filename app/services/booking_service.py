@@ -8,11 +8,13 @@ from app.models.booking import BookingStatus
 from app.schemas.booking import (
     CreateBookingRequest,
     BookingResponse,
+    GuideBookingResponse,
     InvoiceResponse,
 )
 
 COLLECTION = "bookings"
 INVOICES_COLLECTION = "booking_invoices"
+USERS_COLLECTION = "users"
 
 CANCELLABLE_STATUSES = {BookingStatus.PENDING.value, BookingStatus.CONFIRMED.value}
 
@@ -70,6 +72,31 @@ async def list_my_bookings(customer_id: str, status_filter: Optional[BookingStat
         query["status"] = status_filter.value if isinstance(status_filter, BookingStatus) else status_filter
     docs = await db[COLLECTION].find(query).sort("created_at", -1).to_list(length=None)
     return [_to_response(d) for d in docs]
+
+
+async def list_guide_bookings(guide_id: str, status_filter: Optional[BookingStatus] = None) -> list:
+    """(Guide) Réservations reçues sur son propre profil, avec le nom/téléphone du client."""
+    db = get_database()
+    query: dict = {"item_type": "guide", "item_id": guide_id}
+    if status_filter:
+        query["status"] = status_filter.value if isinstance(status_filter, BookingStatus) else status_filter
+    docs = await db[COLLECTION].find(query).sort("created_at", -1).to_list(length=None)
+
+    customer_ids = {d["customer_id"] for d in docs if ObjectId.is_valid(d["customer_id"])}
+    user_docs = await db[USERS_COLLECTION].find({"_id": {"$in": [ObjectId(c) for c in customer_ids]}}).to_list(length=None)
+    users_by_id = {str(u["_id"]): u for u in user_docs}
+
+    items = []
+    for d in docs:
+        customer = users_by_id.get(d["customer_id"])
+        items.append(
+            GuideBookingResponse(
+                **_to_response(d).model_dump(),
+                customer_name=customer.get("full_name") if customer else None,
+                customer_phone=customer.get("phone") if customer else None,
+            )
+        )
+    return items
 
 
 async def get_booking(booking_id: str, current_user_id: str, is_admin: bool) -> BookingResponse:

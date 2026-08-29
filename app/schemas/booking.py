@@ -32,6 +32,11 @@ class BookingResponse(BaseModel):
     created_at: datetime
 
 
+class GuideBookingResponse(BookingResponse):
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+
+
 class CancelBookingRequest(BaseModel):
     reason: Optional[str] = None
 

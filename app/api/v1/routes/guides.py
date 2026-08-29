@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Query, status
 from app.core.security import get_current_user, get_current_user_optional, require_role
 from app.models.user import UserRole
 from app.schemas.auth import TokenPayload
+from app.models.booking import BookingStatus
 from app.schemas.guide import (
     CreateGuideProfileRequest,
     UpdateGuideProfileRequest,
@@ -10,7 +11,7 @@ from app.schemas.guide import (
     GuideDetail,
     GuideListResponse,
 )
-from app.services import guide_service
+from app.services import guide_service, booking_service
 
 router = APIRouter(prefix="/guides", tags=["Guides touristiques"])
 
@@ -41,6 +42,16 @@ async def get_my_guide_profile(
 ):
     """(Guide) Consulter son propre profil."""
     return await guide_service.get_guide_by_user_id(current_user.sub)
+
+
+@router.get("/me/bookings", response_model=list)
+async def list_my_guide_bookings(
+    status_filter: Optional[BookingStatus] = None,
+    current_user: TokenPayload = Depends(require_role(UserRole.GUIDE, UserRole.ADMIN)),
+):
+    """(Guide) Réservations reçues sur son propre profil."""
+    guide = await guide_service.get_guide_by_user_id(current_user.sub)
+    return await booking_service.list_guide_bookings(guide.id, status_filter)
 
 
 @router.get("/{guide_id}", response_model=GuideDetail)
