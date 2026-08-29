@@ -12,7 +12,8 @@ from app.schemas.guide import (
     GuideListResponse,
 )
 from app.schemas.review import ReviewListResponse
-from app.services import guide_service, booking_service, review_service
+from app.schemas.guide_analytics import GuideAnalyticsSummary
+from app.services import guide_service, booking_service, review_service, guide_analytics_service
 
 router = APIRouter(prefix="/guides", tags=["Guides touristiques"])
 
@@ -64,6 +65,15 @@ async def list_my_guide_reviews(
     """(Guide) Avis reçus sur son propre profil, avec répartition des notes."""
     guide = await guide_service.get_guide_by_user_id(current_user.sub)
     return await review_service.list_reviews_for_target("guide", guide.id, page, page_size)
+
+
+@router.get("/me/analytics", response_model=GuideAnalyticsSummary)
+async def get_my_guide_analytics(
+    current_user: TokenPayload = Depends(require_role(UserRole.GUIDE, UserRole.ADMIN)),
+):
+    """(Guide) Statistiques de clients et de revenus (quotidien/mensuel/annuel)."""
+    guide = await guide_service.get_guide_by_user_id(current_user.sub)
+    return await guide_analytics_service.get_guide_analytics(guide.id, guide.currency)
 
 
 @router.get("/{guide_id}", response_model=GuideDetail)
