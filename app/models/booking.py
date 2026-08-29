@@ -31,6 +31,7 @@ class Booking(BaseModel):
     provider_id: Optional[str] = None  # user_id du prestataire (résolu à la création)
     item_type: BookingItemType
     item_id: str
+    slot_id: Optional[str] = None  # créneau de disponibilité verrouillé (item_type == "guide")
     item_title: str
     quantity: int = Field(default=1, gt=0)
     unit_price: float

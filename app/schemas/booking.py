@@ -12,6 +12,11 @@ class CreateBookingRequest(BaseModel):
     unit_price: float = Field(..., ge=0)
     currency: str = "XOF"
     scheduled_date: Optional[datetime] = None
+    slot_id: Optional[str] = Field(
+        default=None,
+        description="Créneau de disponibilité choisi (item_type == \"guide\"). "
+        "Verrouille le créneau et déduit scheduled_date automatiquement.",
+    )
 
 
 class BookingResponse(BaseModel):
@@ -21,6 +26,7 @@ class BookingResponse(BaseModel):
     provider_id: Optional[str] = None
     item_type: BookingItemType
     item_id: str
+    slot_id: Optional[str] = None
     item_title: str
     quantity: int
     unit_price: float

@@ -23,6 +23,7 @@ COLLECTION = "bookings"
 INVOICES_COLLECTION = "booking_invoices"
 USERS_COLLECTION = "users"
 CONVERSATIONS_COLLECTION = "conversations"
+SLOTS_COLLECTION = "guide_availability_slots"
 
 CANCELLABLE_STATUSES = {BookingStatus.PENDING.value, BookingStatus.CONFIRMED.value}
 
@@ -52,6 +53,7 @@ def _to_response(doc: dict) -> BookingResponse:
         provider_id=doc.get("provider_id"),
         item_type=doc["item_type"],
         item_id=doc["item_id"],
+        slot_id=doc.get("slot_id"),
         item_title=doc["item_title"],
         quantity=doc["quantity"],
         unit_price=doc["unit_price"],
@@ -65,11 +67,51 @@ def _to_response(doc: dict) -> BookingResponse:
     )
 
 
+async def _lock_slot(slot_id: str, guide_id: str) -> dict:
+    """Verrouille atomiquement un créneau libre appartenant au guide indiqué.
+
+    Utilise find_one_and_update avec le filtre is_booked=False dans la même
+    opération que le verrouillage, pour empêcher deux réservations
+    concurrentes de gagner la course sur le même créneau.
+    """
+    db = get_database()
+    if not ObjectId.is_valid(slot_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Créneau introuvable")
+
+    slot = await db[SLOTS_COLLECTION].find_one({"_id": ObjectId(slot_id)})
+    if not slot:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Créneau introuvable")
+    if slot["guide_id"] != guide_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ce créneau n'appartient pas au guide indiqué")
+
+    locked = await db[SLOTS_COLLECTION].find_one_and_update(
+        {"_id": ObjectId(slot_id), "is_booked": False},
+        {"$set": {"is_booked": True}},
+    )
+    if not locked:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ce créneau vient d'être réservé par quelqu'un d'autre")
+    return locked
+
+
+async def _release_slot(slot_id: str) -> None:
+    if not slot_id or not ObjectId.is_valid(slot_id):
+        return
+    db = get_database()
+    await db[SLOTS_COLLECTION].update_one({"_id": ObjectId(slot_id)}, {"$set": {"is_booked": False}})
+
+
 async def create_booking(data: CreateBookingRequest, customer_id: str) -> BookingResponse:
     db = get_database()
     now = datetime.utcnow()
     reference = _generate_reference()
     provider_id = await resolve_provider_id(data.item_type.value, data.item_id)
+
+    scheduled_date = data.scheduled_date
+    if data.slot_id:
+        if data.item_type.value != "guide":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="slot_id n'est utilisable que pour item_type=guide")
+        slot = await _lock_slot(data.slot_id, guide_id=data.item_id)
+        scheduled_date = datetime.strptime(f"{slot['date']} {slot['start_time']}", "%Y-%m-%d %H:%M")
 
     doc = data.model_dump()
     doc["customer_id"] = customer_id
@@ -79,10 +121,16 @@ async def create_booking(data: CreateBookingRequest, customer_id: str) -> Bookin
     doc["status"] = BookingStatus.PENDING.value
     doc["ticket_qr_code"] = reference
     doc["cancellation_reason"] = None
+    doc["scheduled_date"] = scheduled_date
     doc["created_at"] = now
     doc["updated_at"] = now
 
-    result = await db[COLLECTION].insert_one(doc)
+    try:
+        result = await db[COLLECTION].insert_one(doc)
+    except Exception:
+        if data.slot_id:
+            await _release_slot(data.slot_id)
+        raise
     doc["_id"] = result.inserted_id
     booking = _to_response(doc)
 
@@ -228,6 +276,9 @@ async def cancel_booking(booking_id: str, reason: Optional[str], current_user_id
     )
     doc = await db[COLLECTION].find_one({"_id": ObjectId(booking_id)})
     booking = _to_response(doc)
+
+    if booking.slot_id:
+        await _release_slot(booking.slot_id)
 
     notify_user_id = booking.provider_id if current_user_id == booking.customer_id else booking.customer_id
     if notify_user_id:
