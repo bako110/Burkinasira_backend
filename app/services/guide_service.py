@@ -47,6 +47,7 @@ def _to_detail(doc: dict) -> GuideDetail:
         currency=doc.get("currency", "XOF"),
         is_verified=doc.get("is_verified", False),
         status=doc.get("status", GuideStatus.PENDING.value),
+        rejection_reason=doc.get("rejection_reason"),
         average_rating=doc.get("average_rating", 0.0),
         review_count=doc.get("review_count", 0),
         visits_completed=doc.get("visits_completed", 0),
@@ -171,6 +172,53 @@ async def set_verification_status(guide_id: str, is_verified: bool) -> GuideDeta
     result = await db[COLLECTION].update_one(
         {"_id": ObjectId(guide_id)},
         {"$set": {"is_verified": is_verified, "status": GuideStatus.ACTIVE.value, "updated_at": datetime.utcnow()}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guide introuvable")
+    return await get_guide(guide_id)
+
+
+async def approve_guide(guide_id: str) -> GuideDetail:
+    """(Admin) Approuver un guide : active son profil ET son compte utilisateur."""
+    db = get_database()
+    if not ObjectId.is_valid(guide_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guide introuvable")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(guide_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guide introuvable")
+
+    now = datetime.utcnow()
+    await db[COLLECTION].update_one(
+        {"_id": ObjectId(guide_id)},
+        {
+            "$set": {
+                "is_verified": True,
+                "status": GuideStatus.ACTIVE.value,
+                "rejection_reason": None,
+                "updated_at": now,
+            }
+        },
+    )
+    if ObjectId.is_valid(doc["user_id"]):
+        await db["users"].update_one({"_id": ObjectId(doc["user_id"])}, {"$set": {"is_verified": True}})
+    return await get_guide(guide_id)
+
+
+async def reject_guide(guide_id: str, reason: str) -> GuideDetail:
+    """(Admin) Rejeter un guide avec un motif ; il reste en attente et peut corriger puis resoumettre."""
+    db = get_database()
+    if not ObjectId.is_valid(guide_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guide introuvable")
+    result = await db[COLLECTION].update_one(
+        {"_id": ObjectId(guide_id)},
+        {
+            "$set": {
+                "is_verified": False,
+                "status": GuideStatus.PENDING.value,
+                "rejection_reason": reason,
+                "updated_at": datetime.utcnow(),
+            }
+        },
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guide introuvable")

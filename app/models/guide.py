@@ -31,6 +31,7 @@ class GuideProfile(BaseModel):
     currency: str = "XOF"
     is_verified: bool = False
     status: GuideStatus = GuideStatus.PENDING
+    rejection_reason: Optional[str] = None
     average_rating: float = 0.0
     review_count: int = 0
     visits_completed: int = 0

@@ -59,11 +59,16 @@ class GuideDetail(BaseModel):
     currency: str
     is_verified: bool
     status: GuideStatus
+    rejection_reason: Optional[str] = None
     average_rating: float
     review_count: int
     visits_completed: int
     created_at: datetime
     updated_at: datetime
+
+
+class RejectGuideRequest(BaseModel):
+    reason: str = Field(..., min_length=3)
 
 
 class GuideListResponse(BaseModel):

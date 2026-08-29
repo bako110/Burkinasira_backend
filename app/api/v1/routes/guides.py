@@ -6,6 +6,7 @@ from app.schemas.auth import TokenPayload
 from app.schemas.guide import (
     CreateGuideProfileRequest,
     UpdateGuideProfileRequest,
+    RejectGuideRequest,
     GuideDetail,
     GuideListResponse,
 )
@@ -101,3 +102,22 @@ async def verify_guide(
 ):
     """(Admin) Vérifier un guide (§37 GoTours Verified)."""
     return await guide_service.set_verification_status(guide_id, is_verified)
+
+
+@router.post("/{guide_id}/approve", response_model=GuideDetail)
+async def approve_guide(
+    guide_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Approuver un guide : active son profil et son compte."""
+    return await guide_service.approve_guide(guide_id)
+
+
+@router.post("/{guide_id}/reject", response_model=GuideDetail)
+async def reject_guide(
+    guide_id: str,
+    data: RejectGuideRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Rejeter un guide avec un motif ; il peut corriger et resoumettre."""
+    return await guide_service.reject_guide(guide_id, data.reason)
