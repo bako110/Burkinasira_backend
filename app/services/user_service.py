@@ -30,6 +30,36 @@ def _to_public(doc: dict) -> UserPublic:
     )
 
 
+async def create_managed_user(email: str, password: str, full_name: str, role: UserRole) -> UserPublic:
+    """Crée un compte utilisateur pour un membre d'équipe invité par un provider
+    (ex: gérant d'une succursale), avec un mot de passe temporaire défini par l'inviteur.
+    Le compte est directement actif et vérifié : il hérite de la confiance du compte
+    qui l'invite, il n'a pas besoin de repasser par la vérification de documents."""
+    db = get_database()
+    existing = await db[COLLECTION].find_one({"email": email.lower()})
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Un compte existe déjà avec cet email")
+
+    now = datetime.utcnow()
+    doc = {
+        "full_name": full_name,
+        "email": email.lower(),
+        "phone": None,
+        "hashed_password": hash_password(password),
+        "role": role.value,
+        "status": UserStatus.ACTIVE.value,
+        "is_verified": True,
+        "avatar_url": None,
+        "preferred_language": "fr",
+        "created_at": now,
+        "updated_at": now,
+        "last_login_at": None,
+    }
+    result = await db[COLLECTION].insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return _to_public(doc)
+
+
 async def register_user(data: RegisterRequest) -> TokenResponse:
     db = get_database()
     existing = await db[COLLECTION].find_one({"email": data.email.lower()})

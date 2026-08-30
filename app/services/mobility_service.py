@@ -109,7 +109,13 @@ async def list_providers(
 
 async def list_my_providers(owner_id: str) -> list:
     db = get_database()
-    docs = await db[PROVIDERS_COLLECTION].find({"owner_id": owner_id}).to_list(length=None)
+    from app.services.booking_provider_resolver import list_managed_establishment_ids
+
+    managed_ids = [
+        ObjectId(i) for i in await list_managed_establishment_ids(owner_id, "transport") if ObjectId.is_valid(i)
+    ]
+    query = {"$or": [{"owner_id": owner_id}, {"_id": {"$in": managed_ids}}]} if managed_ids else {"owner_id": owner_id}
+    docs = await db[PROVIDERS_COLLECTION].find(query).to_list(length=None)
     return [_provider_to_detail(d) for d in docs]
 
 
@@ -130,8 +136,11 @@ async def update_provider(provider_id: str, data: UpdateTransportProviderRequest
     doc = await db[PROVIDERS_COLLECTION].find_one({"_id": ObjectId(provider_id)})
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prestataire de transport introuvable")
-    if doc["owner_id"] != current_user_id and not is_admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez modifier que votre propre profil")
+    if not is_admin:
+        from app.services.booking_provider_resolver import is_authorized_for_establishment
+
+        if not await is_authorized_for_establishment("transport", provider_id, current_user_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez modifier que votre propre profil")
 
     update_fields = data.model_dump(exclude_unset=True, exclude_none=True)
     if update_fields:

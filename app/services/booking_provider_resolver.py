@@ -65,3 +65,14 @@ async def is_authorized_for_establishment(item_type: str, item_id: str, user_id:
         "is_active": True,
     })
     return member is not None
+
+
+async def list_managed_establishment_ids(user_id: str, item_type: str) -> list:
+    """IDs des établissements d'un type donné auxquels user_id a accès en tant que membre
+    d'équipe actif (mais dont il n'est pas le propriétaire) — ex: le gérant d'une succursale."""
+    db = get_database()
+    docs = await db["pro_team_members"].find(
+        {"user_id": user_id, "establishment_type": item_type, "is_active": True},
+        {"establishment_id": 1},
+    ).to_list(length=None)
+    return [d["establishment_id"] for d in docs if d.get("establishment_id")]

@@ -134,7 +134,13 @@ async def list_restaurants(
 
 async def list_my_restaurants(owner_id: str) -> list:
     db = get_database()
-    docs = await db[COLLECTION].find({"owner_id": owner_id}).to_list(length=None)
+    from app.services.booking_provider_resolver import list_managed_establishment_ids
+
+    managed_ids = [
+        ObjectId(i) for i in await list_managed_establishment_ids(owner_id, "restaurant") if ObjectId.is_valid(i)
+    ]
+    query = {"$or": [{"owner_id": owner_id}, {"_id": {"$in": managed_ids}}]} if managed_ids else {"owner_id": owner_id}
+    docs = await db[COLLECTION].find(query).to_list(length=None)
     return [_to_detail(d) for d in docs]
 
 
@@ -155,8 +161,11 @@ async def update_restaurant(restaurant_id: str, data: UpdateRestaurantRequest, c
     doc = await db[COLLECTION].find_one({"_id": ObjectId(restaurant_id)})
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Restaurant introuvable")
-    if doc["owner_id"] != current_user_id and not is_admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez modifier que vos propres restaurants")
+    if not is_admin:
+        from app.services.booking_provider_resolver import is_authorized_for_establishment
+
+        if not await is_authorized_for_establishment("restaurant", restaurant_id, current_user_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez modifier que vos propres restaurants")
 
     update_fields = data.model_dump(exclude_unset=True, exclude_none=True)
     if update_fields:

@@ -122,7 +122,7 @@ async def list_my_promotions(provider_id: str) -> list:
 
 # --- Équipe ---
 
-def _team_member_to_response(doc: dict) -> TeamMemberResponse:
+def _team_member_to_response(doc: dict, account_created: bool = False) -> TeamMemberResponse:
     return TeamMemberResponse(
         id=str(doc["_id"]),
         provider_id=doc["provider_id"],
@@ -132,6 +132,7 @@ def _team_member_to_response(doc: dict) -> TeamMemberResponse:
         establishment_type=doc.get("establishment_type"),
         establishment_id=doc.get("establishment_id"),
         is_active=doc.get("is_active", True),
+        account_created=account_created,
     )
 
 
@@ -146,9 +147,22 @@ async def invite_team_member(data: InviteTeamMemberRequest, provider_id: str) ->
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cet établissement ne vous appartient pas")
 
     existing_user = await db["users"].find_one({"email": data.email.lower()})
+    account_created = False
+    if existing_user:
+        user_id = str(existing_user["_id"])
+    else:
+        from app.models.user import UserRole
+        from app.services.user_service import create_managed_user
+
+        created = await create_managed_user(
+            email=data.email, password=data.temporary_password, full_name=data.full_name, role=UserRole.PROVIDER
+        )
+        user_id = created.id
+        account_created = True
+
     doc = {
         "provider_id": provider_id,
-        "user_id": str(existing_user["_id"]) if existing_user else None,
+        "user_id": user_id,
         "email": data.email.lower(),
         "role": data.role.value,
         "establishment_type": data.establishment_type,
@@ -158,7 +172,7 @@ async def invite_team_member(data: InviteTeamMemberRequest, provider_id: str) ->
     }
     result = await db[TEAM_COLLECTION].insert_one(doc)
     doc["_id"] = result.inserted_id
-    return _team_member_to_response(doc)
+    return _team_member_to_response(doc, account_created=account_created)
 
 
 async def list_team_members(provider_id: str, establishment_type: str = None, establishment_id: str = None) -> list:

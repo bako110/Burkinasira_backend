@@ -40,6 +40,8 @@ class PromotionResponse(BaseModel):
 
 class InviteTeamMemberRequest(BaseModel):
     email: str
+    full_name: str = Field(..., min_length=2, max_length=150)
+    temporary_password: str = Field(..., min_length=6)
     role: TeamMemberRole = TeamMemberRole.STAFF
     establishment_type: Optional[str] = None
     establishment_id: Optional[str] = None
@@ -54,3 +56,4 @@ class TeamMemberResponse(BaseModel):
     establishment_type: Optional[str] = None
     establishment_id: Optional[str] = None
     is_active: bool
+    account_created: bool = False

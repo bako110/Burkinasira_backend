@@ -139,7 +139,11 @@ async def list_hotels(
 
 async def list_my_hotels(owner_id: str) -> list:
     db = get_database()
-    docs = await db[COLLECTION].find({"owner_id": owner_id}).to_list(length=None)
+    from app.services.booking_provider_resolver import list_managed_establishment_ids
+
+    managed_ids = [ObjectId(i) for i in await list_managed_establishment_ids(owner_id, "hotel") if ObjectId.is_valid(i)]
+    query = {"$or": [{"owner_id": owner_id}, {"_id": {"$in": managed_ids}}]} if managed_ids else {"owner_id": owner_id}
+    docs = await db[COLLECTION].find(query).to_list(length=None)
     return [_to_detail(d) for d in docs]
 
 
@@ -160,8 +164,11 @@ async def update_hotel(hotel_id: str, data: UpdateHotelRequest, current_user_id:
     doc = await db[COLLECTION].find_one({"_id": ObjectId(hotel_id)})
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hébergement introuvable")
-    if doc["owner_id"] != current_user_id and not is_admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez modifier que vos propres hébergements")
+    if not is_admin:
+        from app.services.booking_provider_resolver import is_authorized_for_establishment
+
+        if not await is_authorized_for_establishment("hotel", hotel_id, current_user_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez modifier que vos propres hébergements")
 
     update_fields = data.model_dump(exclude_unset=True, exclude_none=True)
     if update_fields:
