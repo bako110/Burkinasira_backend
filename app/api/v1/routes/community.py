@@ -128,9 +128,14 @@ async def delete_favorite_list(
 # --- Groupes de voyageurs ---
 
 @router.get("/groups", response_model=list)
-async def list_groups(public_only: bool = True, region: Optional[str] = None, theme: Optional[str] = None):
+async def list_groups(
+    public_only: bool = True,
+    region: Optional[str] = None,
+    province: Optional[str] = None,
+    theme: Optional[str] = None,
+):
     """Groupes de voyageurs, filtrables par région ou thème pour la découverte locale/internationale (§27)."""
-    return await community_service.list_groups(public_only, region, theme)
+    return await community_service.list_groups(public_only, region, theme, province)
 
 
 @router.post("/groups", response_model=GroupResponse, status_code=status.HTTP_201_CREATED)

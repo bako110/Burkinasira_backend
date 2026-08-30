@@ -70,6 +70,7 @@ class CreateGroupRequest(BaseModel):
     description: Optional[str] = None
     cover_photo: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     theme: Optional[str] = None
     is_public: bool = True
 
@@ -80,6 +81,7 @@ class GroupResponse(BaseModel):
     description: Optional[str] = None
     cover_photo: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     theme: Optional[str] = None
     creator_id: str
     member_ids: List[str]
@@ -100,6 +102,7 @@ class GroupDetailResponse(BaseModel):
     description: Optional[str] = None
     cover_photo: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     theme: Optional[str] = None
     creator_id: str
     members: List[GroupMemberPublic]

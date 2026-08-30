@@ -69,6 +69,7 @@ class TravelerGroup(BaseModel):
     description: Optional[str] = None
     cover_photo: Optional[str] = None
     region: Optional[str] = None  # ex: "Hauts-Bassins" ou pays pour un groupe international
+    province: Optional[str] = None
     theme: Optional[str] = None  # ex: "randonnée", "gastronomie", "diaspora"
     creator_id: str
     member_ids: List[str] = []

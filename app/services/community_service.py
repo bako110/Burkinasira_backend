@@ -248,6 +248,7 @@ def _group_to_response(doc: dict) -> GroupResponse:
         description=doc.get("description"),
         cover_photo=doc.get("cover_photo"),
         region=doc.get("region"),
+        province=doc.get("province"),
         theme=doc.get("theme"),
         creator_id=doc["creator_id"],
         member_ids=doc.get("member_ids", []),
@@ -282,11 +283,14 @@ async def list_groups(
     public_only: bool = True,
     region: Optional[str] = None,
     theme: Optional[str] = None,
+    province: Optional[str] = None,
 ) -> list:
     db = get_database()
     query: dict = {"is_public": True} if public_only else {}
     if region:
         query["region"] = region
+    if province:
+        query["province"] = province
     if theme:
         query["theme"] = theme
     docs = await db[GROUPS_COLLECTION].find(query).to_list(length=None)
@@ -359,6 +363,7 @@ async def get_group_detail(group_id: str) -> GroupDetailResponse:
         description=doc.get("description"),
         cover_photo=doc.get("cover_photo"),
         region=doc.get("region"),
+        province=doc.get("province"),
         theme=doc.get("theme"),
         creator_id=doc["creator_id"],
         members=members,
