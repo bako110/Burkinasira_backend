@@ -51,7 +51,6 @@ class Hotel(BaseModel):
     address: Optional[str] = None
     photos: List[str] = []
     videos: List[str] = []
-    photos_360: List[str] = []
     amenities: List[str] = []
     room_types: List[RoomType] = []
     offers: List[Offer] = []

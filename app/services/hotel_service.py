@@ -51,7 +51,6 @@ def _to_detail(doc: dict) -> HotelDetail:
         address=doc.get("address"),
         photos=doc.get("photos", []),
         videos=doc.get("videos", []),
-        photos_360=doc.get("photos_360", []),
         amenities=doc.get("amenities", []),
         room_types=doc.get("room_types", []),
         offers=doc.get("offers", []),

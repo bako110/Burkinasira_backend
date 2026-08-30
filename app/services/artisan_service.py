@@ -33,7 +33,6 @@ def _artisan_to_response(doc: dict) -> ArtisanResponse:
         photo_url=doc.get("photo_url"),
         photos=doc.get("photos", []),
         videos=doc.get("videos", []),
-        photos_360=doc.get("photos_360", []),
         region=doc["region"],
         province=doc.get("province"),
         city=doc.get("city"),

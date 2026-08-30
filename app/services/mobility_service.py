@@ -49,7 +49,6 @@ def _provider_to_detail(doc: dict) -> TransportProviderDetail:
         vehicle_info=doc.get("vehicle_info"),
         photos=doc.get("photos", []),
         videos=doc.get("videos", []),
-        photos_360=doc.get("photos_360", []),
         price_estimate=doc.get("price_estimate"),
         price_currency=doc.get("price_currency", "XOF"),
         contact_phone=doc["contact_phone"],

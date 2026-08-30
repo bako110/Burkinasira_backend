@@ -36,7 +36,6 @@ class Artisan(BaseModel):
     photo_url: Optional[str] = None
     photos: List[str] = []
     videos: List[str] = []
-    photos_360: List[str] = []
     region: str
     province: Optional[str] = None
     city: Optional[str] = None

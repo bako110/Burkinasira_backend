@@ -35,7 +35,6 @@ class TransportProvider(BaseModel):
     vehicle_info: Optional[str] = None
     photos: List[str] = []
     videos: List[str] = []
-    photos_360: List[str] = []
     price_estimate: Optional[float] = None
     price_currency: str = "XOF"
     contact_phone: str

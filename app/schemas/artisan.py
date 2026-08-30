@@ -10,7 +10,6 @@ class CreateArtisanRequest(BaseModel):
     photo_url: Optional[str] = None
     photos: List[str] = []
     videos: List[str] = []
-    photos_360: List[str] = []
     region: str
     province: Optional[str] = None
     city: Optional[str] = None
@@ -22,7 +21,6 @@ class UpdateArtisanRequest(BaseModel):
     photo_url: Optional[str] = None
     photos: Optional[List[str]] = None
     videos: Optional[List[str]] = None
-    photos_360: Optional[List[str]] = None
     region: Optional[str] = None
     province: Optional[str] = None
     city: Optional[str] = None
@@ -36,7 +34,6 @@ class ArtisanResponse(BaseModel):
     photo_url: Optional[str] = None
     photos: List[str] = []
     videos: List[str] = []
-    photos_360: List[str] = []
     region: str
     province: Optional[str] = None
     city: Optional[str] = None

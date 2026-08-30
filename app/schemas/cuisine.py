@@ -17,7 +17,6 @@ class CreateRestaurantRequest(BaseModel):
     address: Optional[str] = None
     photos: List[str] = []
     videos: List[str] = []
-    photos_360: List[str] = []
     opening_hours: List[OpeningHours] = []
     menu: List[MenuItem] = []
     dietary_tags: List[DietaryTag] = []
@@ -40,7 +39,6 @@ class UpdateRestaurantRequest(BaseModel):
     address: Optional[str] = None
     photos: Optional[List[str]] = None
     videos: Optional[List[str]] = None
-    photos_360: Optional[List[str]] = None
     opening_hours: Optional[List[OpeningHours]] = None
     menu: Optional[List[MenuItem]] = None
     dietary_tags: Optional[List[DietaryTag]] = None
@@ -80,7 +78,6 @@ class RestaurantDetail(BaseModel):
     address: Optional[str] = None
     photos: List[str]
     videos: List[str]
-    photos_360: List[str]
     opening_hours: List[OpeningHours]
     menu: List[MenuItem]
     dietary_tags: List[DietaryTag]
