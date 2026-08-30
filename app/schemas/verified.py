@@ -24,6 +24,27 @@ class VerificationRequestResponse(BaseModel):
     created_at: datetime
 
 
+class PendingEstablishmentSummary(BaseModel):
+    kind: str  # "hotel" | "restaurant" | "transport" | "artisan"
+    name: str
+
+
+class VerificationRequestAdminSummary(BaseModel):
+    """(Admin) Demande de vérification enrichie avec l'identité du compte et
+    un aperçu des établissements en brouillon qu'il a déjà soumis."""
+    id: str
+    user_id: str
+    user_full_name: str
+    user_email: str
+    user_role: str
+    document_type: VerificationDocumentType
+    document_url: str
+    status: VerificationStatus
+    review_notes: Optional[str] = None
+    created_at: datetime
+    pending_establishments: List[PendingEstablishmentSummary] = []
+
+
 class CreateDisputeRequest(BaseModel):
     against_user_id: Optional[str] = None
     subject: str = Field(..., min_length=3, max_length=200)

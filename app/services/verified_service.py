@@ -8,6 +8,8 @@ from app.schemas.verified import (
     SubmitVerificationRequest,
     ReviewVerificationRequest,
     VerificationRequestResponse,
+    VerificationRequestAdminSummary,
+    PendingEstablishmentSummary,
     CreateDisputeRequest,
     ResolveDisputeRequest,
     DisputeResponse,
@@ -55,10 +57,56 @@ async def list_my_verifications(user_id: str) -> list:
     return [_verification_to_response(d) for d in docs]
 
 
+async def _find_pending_establishments(db, owner_id: str) -> list:
+    """Aperçu des établissements en brouillon/attente déjà soumis par ce compte,
+    pour aider l'admin à évaluer la demande sans changer d'écran."""
+    from app.models.hotel import HotelStatus
+    from app.models.cuisine import CuisineStatus
+    from app.models.mobility import TransportProviderStatus
+    from app.models.artisan import ArtisanStatus
+
+    summaries = []
+    async for doc in db["hotels"].find({"owner_id": owner_id, "status": HotelStatus.DRAFT.value}, {"name": 1}):
+        summaries.append(PendingEstablishmentSummary(kind="hotel", name=doc["name"]))
+    async for doc in db["restaurants"].find({"owner_id": owner_id, "status": CuisineStatus.DRAFT.value}, {"name": 1}):
+        summaries.append(PendingEstablishmentSummary(kind="restaurant", name=doc["name"]))
+    async for doc in db["transport_providers"].find(
+        {"owner_id": owner_id, "status": TransportProviderStatus.PENDING.value}, {"name": 1}
+    ):
+        summaries.append(PendingEstablishmentSummary(kind="transport", name=doc["name"]))
+    async for doc in db["artisans"].find(
+        {"user_id": owner_id, "status": ArtisanStatus.PENDING.value}, {"display_name": 1}
+    ):
+        summaries.append(PendingEstablishmentSummary(kind="artisan", name=doc["display_name"]))
+    return summaries
+
+
 async def list_pending_verifications() -> list:
     db = get_database()
     docs = await db[VERIFICATION_COLLECTION].find({"status": VerificationStatus.PENDING.value}).to_list(length=None)
-    return [_verification_to_response(d) for d in docs]
+
+    summaries = []
+    for doc in docs:
+        user = None
+        if ObjectId.is_valid(doc["user_id"]):
+            user = await db["users"].find_one({"_id": ObjectId(doc["user_id"])})
+        pending_establishments = await _find_pending_establishments(db, doc["user_id"])
+        summaries.append(
+            VerificationRequestAdminSummary(
+                id=str(doc["_id"]),
+                user_id=doc["user_id"],
+                user_full_name=user.get("full_name", "Utilisateur") if user else "Utilisateur introuvable",
+                user_email=user.get("email", "") if user else "",
+                user_role=user.get("role", "") if user else "",
+                document_type=doc["document_type"],
+                document_url=doc["document_url"],
+                status=doc.get("status", VerificationStatus.PENDING.value),
+                review_notes=doc.get("review_notes"),
+                created_at=doc["created_at"],
+                pending_establishments=pending_establishments,
+            )
+        )
+    return summaries
 
 
 async def review_verification(request_id: str, data: ReviewVerificationRequest, reviewer_id: str) -> VerificationRequestResponse:
