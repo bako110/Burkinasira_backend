@@ -7,7 +7,9 @@ from app.schemas.auth import TokenPayload
 from app.schemas.verified import (
     SubmitVerificationRequest,
     ReviewVerificationRequest,
+    ReviewAccountRequest,
     VerificationRequestResponse,
+    PendingAccountSummary,
     CreateDisputeRequest,
     ResolveDisputeRequest,
     DisputeResponse,
@@ -46,8 +48,20 @@ async def review_verification(
     data: ReviewVerificationRequest,
     current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
 ):
-    """(Admin) Approuver/rejeter une demande de vérification."""
+    """(Admin) Approuver/rejeter une demande de vérification précise."""
     return await verified_service.review_verification(request_id, data, reviewer_id=current_user.sub)
+
+
+@router.patch("/accounts/{user_id}/review", response_model=PendingAccountSummary)
+async def review_account(
+    user_id: str,
+    data: ReviewAccountRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Approuver/rejeter le compte pro d'un utilisateur, qu'il ait ou
+    non déjà soumis un document de vérification. Publie automatiquement ses
+    établissements en brouillon si approuvé."""
+    return await verified_service.review_account(user_id, data, reviewer_id=current_user.sub)
 
 
 @router.post("/reports", response_model=SuspiciousReportResponse, status_code=status.HTTP_201_CREATED)

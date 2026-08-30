@@ -7,8 +7,10 @@ from app.models.verified import VerificationStatus, DisputeStatus
 from app.schemas.verified import (
     SubmitVerificationRequest,
     ReviewVerificationRequest,
+    ReviewAccountRequest,
     VerificationRequestResponse,
-    VerificationRequestAdminSummary,
+    PendingAccountSummary,
+    SubmittedDocumentSummary,
     PendingEstablishmentSummary,
     CreateDisputeRequest,
     ResolveDisputeRequest,
@@ -81,32 +83,65 @@ async def _find_pending_establishments(db, owner_id: str) -> list:
     return summaries
 
 
-async def list_pending_verifications() -> list:
-    db = get_database()
-    docs = await db[VERIFICATION_COLLECTION].find({"status": VerificationStatus.PENDING.value}).to_list(length=None)
-
-    summaries = []
-    for doc in docs:
-        user = None
-        if ObjectId.is_valid(doc["user_id"]):
-            user = await db["users"].find_one({"_id": ObjectId(doc["user_id"])})
-        pending_establishments = await _find_pending_establishments(db, doc["user_id"])
-        summaries.append(
-            VerificationRequestAdminSummary(
-                id=str(doc["_id"]),
-                user_id=doc["user_id"],
-                user_full_name=user.get("full_name", "Utilisateur") if user else "Utilisateur introuvable",
-                user_email=user.get("email", "") if user else "",
-                user_role=user.get("role", "") if user else "",
-                document_type=doc["document_type"],
-                document_url=doc["document_url"],
-                status=doc.get("status", VerificationStatus.PENDING.value),
-                review_notes=doc.get("review_notes"),
-                created_at=doc["created_at"],
-                pending_establishments=pending_establishments,
-            )
+async def _build_account_summary(db, user: dict) -> PendingAccountSummary:
+    user_id = str(user["_id"])
+    doc_cursor = db[VERIFICATION_COLLECTION].find({"user_id": user_id}).sort("created_at", -1)
+    documents = [
+        SubmittedDocumentSummary(
+            id=str(d["_id"]),
+            document_type=d["document_type"],
+            document_url=d["document_url"],
+            review_notes=d.get("review_notes"),
+            created_at=d["created_at"],
         )
-    return summaries
+        async for d in doc_cursor
+    ]
+    pending_establishments = await _find_pending_establishments(db, user_id)
+    return PendingAccountSummary(
+        user_id=user_id,
+        user_full_name=user.get("full_name", "Utilisateur"),
+        user_email=user.get("email", ""),
+        user_role=user.get("role", ""),
+        documents=documents,
+        pending_establishments=pending_establishments,
+        account_created_at=user["created_at"],
+    )
+
+
+async def list_pending_verifications() -> list:
+    """(Admin) Tous les comptes guide/provider pas encore vérifiés, qu'ils aient
+    ou non déjà soumis un document — un compte qui a seulement rempli son
+    établissement sans envoyer de document ne doit pas rester invisible."""
+    db = get_database()
+    users = await db["users"].find({"role": {"$in": ["guide", "provider"]}, "is_verified": False}).to_list(
+        length=None
+    )
+    return [await _build_account_summary(db, user) for user in users]
+
+
+async def review_account(user_id: str, data: ReviewAccountRequest, reviewer_id: str) -> PendingAccountSummary:
+    """(Admin) Approuve ou rejette le compte pro d'un utilisateur directement,
+    sans exiger qu'une demande de vérification existe déjà."""
+    db = get_database()
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte introuvable")
+    user = await db["users"].find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte introuvable")
+
+    now = datetime.utcnow()
+    new_status = VerificationStatus.ACTIVE.value if data.approve else VerificationStatus.REJECTED.value
+    await db[VERIFICATION_COLLECTION].update_many(
+        {"user_id": user_id, "status": VerificationStatus.PENDING.value},
+        {"$set": {"status": new_status, "review_notes": data.review_notes, "reviewed_by": reviewer_id, "updated_at": now}},
+    )
+
+    if data.approve:
+        await db["users"].update_one({"_id": ObjectId(user_id)}, {"$set": {"is_verified": True}})
+        await _publish_pending_establishments(db, user_id)
+
+    refreshed_user = await db["users"].find_one({"_id": ObjectId(user_id)})
+    return await _build_account_summary(db, refreshed_user)
 
 
 async def review_verification(request_id: str, data: ReviewVerificationRequest, reviewer_id: str) -> VerificationRequestResponse:

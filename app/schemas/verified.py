@@ -14,6 +14,13 @@ class ReviewVerificationRequest(BaseModel):
     review_notes: Optional[str] = None
 
 
+class ReviewAccountRequest(BaseModel):
+    """(Admin) Approuver ou rejeter le compte pro d'un utilisateur, qu'il ait
+    ou non deja soumis un document de verification."""
+    approve: bool
+    review_notes: Optional[str] = None
+
+
 class VerificationRequestResponse(BaseModel):
     id: str
     user_id: str
@@ -29,20 +36,26 @@ class PendingEstablishmentSummary(BaseModel):
     name: str
 
 
-class VerificationRequestAdminSummary(BaseModel):
-    """(Admin) Demande de vérification enrichie avec l'identité du compte et
-    un aperçu des établissements en brouillon qu'il a déjà soumis."""
+class SubmittedDocumentSummary(BaseModel):
     id: str
+    document_type: VerificationDocumentType
+    document_url: str
+    review_notes: Optional[str] = None
+    created_at: datetime
+
+
+class PendingAccountSummary(BaseModel):
+    """(Admin) Compte guide/provider pas encore vérifié, avec les documents et
+    établissements en brouillon qu'il a éventuellement déjà soumis. Un compte
+    apparaît ici dès sa création (is_verified=False), même sans document
+    soumis, pour qu'aucune demande ne reste invisible côté admin."""
     user_id: str
     user_full_name: str
     user_email: str
     user_role: str
-    document_type: VerificationDocumentType
-    document_url: str
-    status: VerificationStatus
-    review_notes: Optional[str] = None
-    created_at: datetime
+    documents: List[SubmittedDocumentSummary] = []
     pending_establishments: List[PendingEstablishmentSummary] = []
+    account_created_at: datetime
 
 
 class CreateDisputeRequest(BaseModel):
