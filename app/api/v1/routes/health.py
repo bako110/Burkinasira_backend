@@ -19,6 +19,7 @@ router = APIRouter(prefix="/health-facilities", tags=["Santé"])
 async def list_health_facilities(
     type: Optional[HealthFacilityType] = None,
     region: Optional[str] = None,
+    province: Optional[str] = None,
     on_duty_only: bool = Query(default=False, description="Pharmacies de garde uniquement"),
     near_lat: Optional[float] = None,
     near_lng: Optional[float] = None,
@@ -28,7 +29,7 @@ async def list_health_facilities(
 ):
     """Pharmacies, hôpitaux, cliniques, laboratoires... par distance/horaires/services (§9)."""
     return await health_service.list_health_facilities(
-        type=type, region=region, on_duty_only=on_duty_only,
+        type=type, region=region, province=province, on_duty_only=on_duty_only,
         near_lat=near_lat, near_lng=near_lng, radius_km=radius_km,
         page=page, page_size=page_size,
     )

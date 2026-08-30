@@ -10,6 +10,7 @@ class CreateConnectivityPointRequest(BaseModel):
     type: ConnectivityPointType
     operator: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     address: Optional[str] = None
@@ -23,6 +24,7 @@ class UpdateConnectivityPointRequest(BaseModel):
     type: Optional[ConnectivityPointType] = None
     operator: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     city: Optional[str] = None
     location: Optional[GeoPoint] = None
     address: Optional[str] = None
@@ -38,6 +40,7 @@ class ConnectivityPointSummary(BaseModel):
     type: ConnectivityPointType
     operator: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     is_free: Optional[bool] = None
@@ -50,6 +53,7 @@ class ConnectivityPointDetail(BaseModel):
     type: ConnectivityPointType
     operator: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     address: Optional[str] = None

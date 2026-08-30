@@ -38,6 +38,7 @@ def _to_summary(doc: dict) -> MoneyServiceSummary:
         type=doc["type"],
         operator=doc.get("operator"),
         region=doc["region"],
+        province=doc.get("province"),
         city=doc.get("city"),
         location=doc["location"],
     )
@@ -50,6 +51,7 @@ def _to_detail(doc: dict) -> MoneyServiceDetail:
         type=doc["type"],
         operator=doc.get("operator"),
         region=doc["region"],
+        province=doc.get("province"),
         city=doc.get("city"),
         location=doc["location"],
         address=doc.get("address"),
@@ -77,6 +79,7 @@ async def create_money_service(data: CreateMoneyServiceRequest) -> MoneyServiceD
 async def list_money_services(
     type: Optional[MoneyServiceType] = None,
     region: Optional[str] = None,
+    province: Optional[str] = None,
     near_lat: Optional[float] = None,
     near_lng: Optional[float] = None,
     radius_km: Optional[float] = None,
@@ -89,6 +92,8 @@ async def list_money_services(
         query["type"] = type.value if isinstance(type, MoneyServiceType) else type
     if region:
         query["region"] = region
+    if province:
+        query["province"] = province
 
     all_docs = await db[COLLECTION].find(query).to_list(length=None)
 

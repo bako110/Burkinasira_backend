@@ -10,6 +10,7 @@ class CreateHealthFacilityRequest(BaseModel):
     type: HealthFacilityType
     description: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     address: Optional[str] = None
@@ -24,6 +25,7 @@ class UpdateHealthFacilityRequest(BaseModel):
     type: Optional[HealthFacilityType] = None
     description: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     city: Optional[str] = None
     location: Optional[GeoPoint] = None
     address: Optional[str] = None
@@ -39,6 +41,7 @@ class HealthFacilitySummary(BaseModel):
     name: str
     type: HealthFacilityType
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     is_on_duty: bool
@@ -51,6 +54,7 @@ class HealthFacilityDetail(BaseModel):
     type: HealthFacilityType
     description: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     address: Optional[str] = None

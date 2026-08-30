@@ -31,6 +31,7 @@ def _to_summary(doc: dict) -> ConnectivityPointSummary:
         type=doc["type"],
         operator=doc.get("operator"),
         region=doc["region"],
+        province=doc.get("province"),
         city=doc.get("city"),
         location=doc["location"],
         is_free=doc.get("is_free"),
@@ -45,6 +46,7 @@ def _to_detail(doc: dict) -> ConnectivityPointDetail:
         type=doc["type"],
         operator=doc.get("operator"),
         region=doc["region"],
+        province=doc.get("province"),
         city=doc.get("city"),
         location=doc["location"],
         address=doc.get("address"),
@@ -73,6 +75,7 @@ async def create_point(data: CreateConnectivityPointRequest) -> ConnectivityPoin
 async def list_points(
     type: Optional[ConnectivityPointType] = None,
     region: Optional[str] = None,
+    province: Optional[str] = None,
     near_lat: Optional[float] = None,
     near_lng: Optional[float] = None,
     radius_km: Optional[float] = None,
@@ -85,6 +88,8 @@ async def list_points(
         query["type"] = type.value if isinstance(type, ConnectivityPointType) else type
     if region:
         query["region"] = region
+    if province:
+        query["province"] = province
 
     all_docs = await db[COLLECTION].find(query).to_list(length=None)
 

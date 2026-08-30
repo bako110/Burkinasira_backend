@@ -31,6 +31,7 @@ def _to_summary(doc: dict) -> HealthFacilitySummary:
         name=doc["name"],
         type=doc["type"],
         region=doc["region"],
+        province=doc.get("province"),
         city=doc.get("city"),
         location=doc["location"],
         is_on_duty=doc.get("is_on_duty", False),
@@ -45,6 +46,7 @@ def _to_detail(doc: dict) -> HealthFacilityDetail:
         type=doc["type"],
         description=doc.get("description"),
         region=doc["region"],
+        province=doc.get("province"),
         city=doc.get("city"),
         location=doc["location"],
         address=doc.get("address"),
@@ -75,6 +77,7 @@ async def create_health_facility(data: CreateHealthFacilityRequest, created_by: 
 async def list_health_facilities(
     type: Optional[HealthFacilityType] = None,
     region: Optional[str] = None,
+    province: Optional[str] = None,
     on_duty_only: bool = False,
     near_lat: Optional[float] = None,
     near_lng: Optional[float] = None,
@@ -89,6 +92,8 @@ async def list_health_facilities(
         query["type"] = type.value if isinstance(type, HealthFacilityType) else type
     if region:
         query["region"] = region
+    if province:
+        query["province"] = province
     if on_duty_only:
         query["is_on_duty"] = True
 

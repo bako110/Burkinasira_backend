@@ -25,6 +25,7 @@ class MoneyServicePoint(BaseModel):
     type: MoneyServiceType
     operator: Optional[str] = None  # ex: "Orange Money", "Coris Bank"
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     address: Optional[str] = None

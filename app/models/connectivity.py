@@ -26,6 +26,7 @@ class ConnectivityPoint(BaseModel):
     type: ConnectivityPointType
     operator: Optional[str] = None  # ex: "Orange", "Moov Africa", "Telecel"
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     address: Optional[str] = None

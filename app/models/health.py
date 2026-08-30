@@ -27,6 +27,7 @@ class HealthFacility(BaseModel):
     type: HealthFacilityType
     description: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     address: Optional[str] = None

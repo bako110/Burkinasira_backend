@@ -10,6 +10,7 @@ class CreateMoneyServiceRequest(BaseModel):
     type: MoneyServiceType
     operator: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     address: Optional[str] = None
@@ -22,6 +23,7 @@ class UpdateMoneyServiceRequest(BaseModel):
     type: Optional[MoneyServiceType] = None
     operator: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     city: Optional[str] = None
     location: Optional[GeoPoint] = None
     address: Optional[str] = None
@@ -36,6 +38,7 @@ class MoneyServiceSummary(BaseModel):
     type: MoneyServiceType
     operator: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
 
@@ -46,6 +49,7 @@ class MoneyServiceDetail(BaseModel):
     type: MoneyServiceType
     operator: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     address: Optional[str] = None

@@ -19,6 +19,7 @@ router = APIRouter(prefix="/connectivity", tags=["Connectivité"])
 async def list_connectivity_points(
     type: Optional[ConnectivityPointType] = None,
     region: Optional[str] = None,
+    province: Optional[str] = None,
     near_lat: Optional[float] = None,
     near_lng: Optional[float] = None,
     radius_km: Optional[float] = None,
@@ -27,7 +28,7 @@ async def list_connectivity_points(
 ):
     """Rechercher un point de connectivité à proximité : opérateurs, SIM/eSIM, Wi-Fi, coworking (§14)."""
     return await connectivity_service.list_points(
-        type=type, region=region, near_lat=near_lat, near_lng=near_lng,
+        type=type, region=region, province=province, near_lat=near_lat, near_lng=near_lng,
         radius_km=radius_km, page=page, page_size=page_size,
     )
 
