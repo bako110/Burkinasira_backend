@@ -1,6 +1,6 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, Query, status
-from app.core.security import get_current_user, get_current_user_optional, require_role
+from app.core.security import get_current_user, get_current_user_optional, require_role, require_verified_provider
 from app.models.user import UserRole
 from app.models.artisan import ProductCategory
 from app.schemas.auth import TokenPayload
@@ -117,6 +117,15 @@ async def list_products(
     return await artisan_service.list_products(category=category, artisan_id=artisan_id, q=q, page=page, page_size=page_size)
 
 
+@router.get("/products/me/list", response_model=list)
+async def list_my_products(
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+):
+    """(Vendeur) Liste de mes produits, tous statuts confondus."""
+    artisan = await artisan_service.get_artisan_by_user_id(current_user.sub)
+    return await artisan_service.list_my_products(artisan.id)
+
+
 @router.get("/products/{product_id}", response_model=ProductDetail)
 async def get_product(product_id: str):
     """Détail d'un produit."""
@@ -126,7 +135,7 @@ async def get_product(product_id: str):
 @router.post("/products", response_model=ProductDetail, status_code=status.HTTP_201_CREATED)
 async def create_product(
     data: CreateProductRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_verified_provider),
 ):
     """(Vendeur) Ajouter un produit à son catalogue. (Admin) Ajouter un produit pour un artisan donné, ou pour la vitrine GoTours si aucun n'est précisé."""
     if current_user.role == UserRole.ADMIN:

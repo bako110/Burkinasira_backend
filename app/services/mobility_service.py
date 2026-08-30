@@ -50,6 +50,7 @@ def _provider_to_detail(doc: dict) -> TransportProviderDetail:
         price_currency=doc.get("price_currency", "XOF"),
         contact_phone=doc["contact_phone"],
         is_verified=doc.get("is_verified", False),
+        status=doc.get("status", TransportProviderStatus.PENDING.value),
         average_rating=doc.get("average_rating", 0.0),
         review_count=doc.get("review_count", 0),
         created_at=doc["created_at"],
@@ -100,6 +101,12 @@ async def list_providers(
         page=page,
         page_size=page_size,
     )
+
+
+async def list_my_providers(owner_id: str) -> list:
+    db = get_database()
+    docs = await db[PROVIDERS_COLLECTION].find({"owner_id": owner_id}).to_list(length=None)
+    return [_provider_to_detail(d) for d in docs]
 
 
 async def get_provider(provider_id: str) -> TransportProviderDetail:

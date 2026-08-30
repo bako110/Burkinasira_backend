@@ -113,8 +113,26 @@ def require_role(*allowed_roles: UserRole):
                 detail=f"Cette action nécessite l'un de ces rôles: {', '.join([r.value for r in allowed_roles])}"
             )
         return current_user
-    
+
     return check_role
+
+
+async def require_verified_provider(
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+) -> TokenPayload:
+    """Comme require_role(PROVIDER, ADMIN), mais bloque en plus un compte provider
+    dont la vérification (documents) n'a pas encore été approuvée."""
+    if current_user.role == UserRole.ADMIN:
+        return current_user
+    from app.services import user_service  # import différé pour éviter un cycle security <-> services
+
+    user = await user_service.get_user_by_id(current_user.sub)
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Votre compte professionnel doit être vérifié avant de publier un établissement",
+        )
+    return current_user
 
 
 async def require_admin(current_user: TokenPayload = Depends(get_current_user)) -> TokenPayload:

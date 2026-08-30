@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.core.security import get_current_user, require_role
 from app.models.user import UserRole
 from app.models.booking import BookingStatus
@@ -11,8 +11,11 @@ from app.schemas.booking import (
     InvoiceResponse,
 )
 from app.services import booking_service
+from app.services.booking_provider_resolver import resolve_owner_id
 
 router = APIRouter(prefix="/bookings", tags=["Réservation et billetterie"])
+
+PROVIDER_ITEM_TYPES = {"hotel", "restaurant", "transport", "product"}
 
 
 @router.post("", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
@@ -37,6 +40,24 @@ async def list_my_bookings(
 async def get_booking_by_reference(reference: str):
     """Présenter/valider le ticket QR Code."""
     return await booking_service.get_booking_by_reference(reference)
+
+
+@router.get("/provider/received", response_model=list)
+async def list_received_bookings(
+    item_type: str = Query(..., description="hotel, restaurant, transport ou product"),
+    item_id: str = Query(...),
+    status_filter: Optional[BookingStatus] = None,
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+):
+    """(Provider) Réservations reçues sur un établissement précis qu'il possède,
+    avec le nom/téléphone du client."""
+    if item_type not in PROVIDER_ITEM_TYPES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Type d'activité invalide")
+    if current_user.role != UserRole.ADMIN:
+        owner_id = await resolve_owner_id(item_type, item_id)
+        if owner_id is None or owner_id != current_user.sub:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cet établissement ne vous appartient pas")
+    return await booking_service.list_provider_bookings(item_type, item_id, status_filter)
 
 
 @router.get("/{booking_id}", response_model=BookingResponse)

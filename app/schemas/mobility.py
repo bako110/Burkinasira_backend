@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from app.models.destination import GeoPoint
-from app.models.mobility import TransportType, TripRequestStatus
+from app.models.mobility import TransportType, TripRequestStatus, TransportProviderStatus
 
 
 class CreateTransportProviderRequest(BaseModel):
@@ -61,6 +61,7 @@ class TransportProviderDetail(BaseModel):
     price_currency: str
     contact_phone: str
     is_verified: bool
+    status: TransportProviderStatus
     average_rating: float
     review_count: int
     created_at: datetime

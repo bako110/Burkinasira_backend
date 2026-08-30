@@ -56,13 +56,14 @@ def _to_detail(doc: dict) -> RestaurantDetail:
         average_rating=doc.get("average_rating", 0.0),
         review_count=doc.get("review_count", 0),
         is_verified=doc.get("is_verified", False),
+        status=doc.get("status", CuisineStatus.DRAFT.value),
         data_source=doc.get("data_source", {}),
         created_at=doc["created_at"],
         updated_at=doc["updated_at"],
     )
 
 
-async def create_restaurant(data: CreateRestaurantRequest, owner_id: str) -> RestaurantDetail:
+async def create_restaurant(data: CreateRestaurantRequest, owner_id: str, is_admin: bool = False) -> RestaurantDetail:
     db = get_database()
     now = datetime.utcnow()
     doc = data.model_dump()
@@ -70,7 +71,13 @@ async def create_restaurant(data: CreateRestaurantRequest, owner_id: str) -> Res
     doc["average_rating"] = 0.0
     doc["review_count"] = 0
     doc["is_verified"] = False
-    doc["status"] = CuisineStatus.PUBLISHED.value
+
+    if is_admin:
+        doc["status"] = CuisineStatus.PUBLISHED.value
+    else:
+        from app.services import user_service
+        owner = await user_service.get_user_by_id(owner_id)
+        doc["status"] = CuisineStatus.PUBLISHED.value if owner.is_verified else CuisineStatus.DRAFT.value
     doc["data_source"] = {"verified": False, "source": None, "last_updated_at": now}
     doc["created_at"] = now
     doc["updated_at"] = now
@@ -121,6 +128,12 @@ async def list_restaurants(
         page=page,
         page_size=page_size,
     )
+
+
+async def list_my_restaurants(owner_id: str) -> list:
+    db = get_database()
+    docs = await db[COLLECTION].find({"owner_id": owner_id}).to_list(length=None)
+    return [_to_detail(d) for d in docs]
 
 
 async def get_restaurant(restaurant_id: str) -> RestaurantDetail:

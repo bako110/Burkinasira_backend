@@ -86,6 +86,7 @@ class RestaurantDetail(BaseModel):
     average_rating: float
     review_count: int
     is_verified: bool
+    status: CuisineStatus
     data_source: DataSource
     created_at: datetime
     updated_at: datetime

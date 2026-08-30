@@ -36,6 +36,14 @@ async def list_hotels(
     )
 
 
+@router.get("/me/list", response_model=list)
+async def list_my_hotels(
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+):
+    """(Provider) Liste de mes hébergements, tous statuts confondus."""
+    return await hotel_service.list_my_hotels(current_user.sub)
+
+
 @router.get("/{hotel_id}", response_model=HotelDetail)
 async def get_hotel(hotel_id: str):
     """Fiche détaillée d'un hébergement."""
@@ -53,8 +61,11 @@ async def create_hotel(
     data: CreateHotelRequest,
     current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
 ):
-    """(Provider) Ajouter un hébergement."""
-    return await hotel_service.create_hotel(data, owner_id=current_user.sub)
+    """(Provider) Ajouter un hébergement. Publié directement si le compte est déjà
+    vérifié, sinon enregistré en brouillon en attendant l'approbation admin."""
+    return await hotel_service.create_hotel(
+        data, owner_id=current_user.sub, is_admin=current_user.role == UserRole.ADMIN
+    )
 
 
 @router.patch("/{hotel_id}", response_model=HotelDetail)

@@ -81,10 +81,39 @@ async def review_verification(request_id: str, data: ReviewVerificationRequest, 
     )
 
     if data.status == VerificationStatus.ACTIVE and ObjectId.is_valid(existing["user_id"]):
-        await db["users"].update_one({"_id": ObjectId(existing["user_id"])}, {"$set": {"is_verified": True}})
+        user_id = existing["user_id"]
+        await db["users"].update_one({"_id": ObjectId(user_id)}, {"$set": {"is_verified": True}})
+        await _publish_pending_establishments(db, user_id)
 
     doc = await db[VERIFICATION_COLLECTION].find_one({"_id": ObjectId(request_id)})
     return _verification_to_response(doc)
+
+
+async def _publish_pending_establishments(db, owner_id: str) -> None:
+    """Une fois le compte provider approuvé, publie automatiquement les
+    établissements qu'il avait déjà créés en brouillon/attente."""
+    from app.models.hotel import HotelStatus
+    from app.models.cuisine import CuisineStatus
+    from app.models.mobility import TransportProviderStatus
+    from app.models.artisan import ArtisanStatus
+
+    now = datetime.utcnow()
+    await db["hotels"].update_many(
+        {"owner_id": owner_id, "status": HotelStatus.DRAFT.value},
+        {"$set": {"status": HotelStatus.PUBLISHED.value, "updated_at": now}},
+    )
+    await db["restaurants"].update_many(
+        {"owner_id": owner_id, "status": CuisineStatus.DRAFT.value},
+        {"$set": {"status": CuisineStatus.PUBLISHED.value, "updated_at": now}},
+    )
+    await db["transport_providers"].update_many(
+        {"owner_id": owner_id, "status": TransportProviderStatus.PENDING.value},
+        {"$set": {"status": TransportProviderStatus.ACTIVE.value, "updated_at": now}},
+    )
+    await db["artisans"].update_many(
+        {"user_id": owner_id, "status": ArtisanStatus.PENDING.value},
+        {"$set": {"status": ArtisanStatus.ACTIVE.value, "updated_at": now}},
+    )
 
 
 # --- Litiges ---

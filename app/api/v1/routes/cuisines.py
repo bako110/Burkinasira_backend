@@ -33,6 +33,14 @@ async def list_restaurants(
     )
 
 
+@router.get("/me/list", response_model=list)
+async def list_my_restaurants(
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+):
+    """(Provider) Liste de mes restaurants, tous statuts confondus."""
+    return await cuisine_service.list_my_restaurants(current_user.sub)
+
+
 @router.get("/{restaurant_id}", response_model=RestaurantDetail)
 async def get_restaurant(restaurant_id: str):
     """Fiche détaillée d'un restaurant, avec menu si disponible."""
@@ -44,8 +52,11 @@ async def create_restaurant(
     data: CreateRestaurantRequest,
     current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
 ):
-    """(Provider) Ajouter un restaurant."""
-    return await cuisine_service.create_restaurant(data, owner_id=current_user.sub)
+    """(Provider) Ajouter un restaurant. Publié directement si le compte est déjà
+    vérifié, sinon enregistré en brouillon en attendant l'approbation admin."""
+    return await cuisine_service.create_restaurant(
+        data, owner_id=current_user.sub, is_admin=current_user.role == UserRole.ADMIN
+    )
 
 
 @router.patch("/{restaurant_id}", response_model=RestaurantDetail)

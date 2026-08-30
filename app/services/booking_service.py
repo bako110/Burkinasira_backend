@@ -157,8 +157,14 @@ async def list_my_bookings(customer_id: str, status_filter: Optional[BookingStat
 
 async def list_guide_bookings(guide_id: str, status_filter: Optional[BookingStatus] = None) -> list:
     """(Guide) Réservations reçues sur son propre profil, avec le nom/téléphone du client."""
+    return await list_provider_bookings("guide", guide_id, status_filter)
+
+
+async def list_provider_bookings(item_type: str, item_id: str, status_filter: Optional[BookingStatus] = None) -> list:
+    """(Provider) Réservations reçues sur un établissement précis (hôtel, restaurant, transport,
+    produit ou guide), avec le nom/téléphone du client."""
     db = get_database()
-    query: dict = {"item_type": "guide", "item_id": guide_id}
+    query: dict = {"item_type": item_type, "item_id": item_id}
     if status_filter:
         query["status"] = status_filter.value if isinstance(status_filter, BookingStatus) else status_filter
     docs = await db[COLLECTION].find(query).sort("created_at", -1).to_list(length=None)

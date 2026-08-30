@@ -32,6 +32,7 @@ class ArtisanResponse(BaseModel):
     province: Optional[str] = None
     city: Optional[str] = None
     is_verified: bool
+    status: ArtisanStatus
     average_rating: float
     review_count: int
     created_at: datetime
@@ -87,6 +88,7 @@ class ProductDetail(BaseModel):
     fulfillment_mode: FulfillmentMode
     average_rating: float
     review_count: int
+    status: ProductStatus
     created_at: datetime
     updated_at: datetime
 

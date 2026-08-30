@@ -12,6 +12,27 @@ _PROVIDER_LOOKUP = {
 }
 
 
+async def resolve_owner_id(item_type: str, item_id: str) -> str | None:
+    """Point d'entrée unique pour retrouver le propriétaire d'un item, quel que soit son type
+    (y compris "product", cas particulier résolu via son profil artisan)."""
+    if item_type == "product":
+        return await resolve_product_owner_id(item_id)
+    return await resolve_provider_id(item_type, item_id)
+
+
+async def resolve_product_owner_id(product_id: str) -> str | None:
+    """Cas particulier "product" : le propriétaire n'est pas sur le produit lui-même
+    mais sur son profil artisan (product.artisan_id -> artisans.user_id)."""
+    if not ObjectId.is_valid(product_id):
+        return None
+    db = get_database()
+    product = await db["artisan_products"].find_one({"_id": ObjectId(product_id)}, {"artisan_id": 1})
+    if not product or not ObjectId.is_valid(product.get("artisan_id", "")):
+        return None
+    artisan = await db["artisans"].find_one({"_id": ObjectId(product["artisan_id"])}, {"user_id": 1})
+    return artisan.get("user_id") if artisan else None
+
+
 async def resolve_provider_id(item_type: str, item_id: str) -> str | None:
     """Retrouve le user_id du prestataire propriétaire d'un item réservable.
 

@@ -35,6 +35,7 @@ def _artisan_to_response(doc: dict) -> ArtisanResponse:
         province=doc.get("province"),
         city=doc.get("city"),
         is_verified=doc.get("is_verified", False),
+        status=doc.get("status", ArtisanStatus.PENDING.value),
         average_rating=doc.get("average_rating", 0.0),
         review_count=doc.get("review_count", 0),
         created_at=doc["created_at"],
@@ -217,6 +218,7 @@ def _product_to_detail(doc: dict) -> ProductDetail:
         fulfillment_mode=doc.get("fulfillment_mode", "les_deux"),
         average_rating=doc.get("average_rating", 0.0),
         review_count=doc.get("review_count", 0),
+        status=doc.get("status", ProductStatus.DRAFT.value),
         created_at=doc["created_at"],
         updated_at=doc["updated_at"],
     )
@@ -266,6 +268,12 @@ async def list_products(
         page=page,
         page_size=page_size,
     )
+
+
+async def list_my_products(artisan_id: str) -> list:
+    db = get_database()
+    docs = await db[PRODUCTS_COLLECTION].find({"artisan_id": artisan_id}).to_list(length=None)
+    return [_product_to_detail(d) for d in docs]
 
 
 async def get_product(product_id: str) -> ProductDetail:

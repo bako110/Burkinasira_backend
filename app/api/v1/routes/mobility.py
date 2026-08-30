@@ -36,6 +36,14 @@ async def list_providers(
     )
 
 
+@router.get("/providers/me/list", response_model=list)
+async def list_my_providers(
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+):
+    """(Provider) Liste de mes services de transport, tous statuts confondus."""
+    return await mobility_service.list_my_providers(current_user.sub)
+
+
 @router.get("/providers/{provider_id}", response_model=TransportProviderDetail)
 async def get_provider(provider_id: str):
     """Détail d'un prestataire de transport."""
@@ -47,7 +55,8 @@ async def create_provider(
     data: CreateTransportProviderRequest,
     current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
 ):
-    """(Provider) Référencer un service de transport."""
+    """(Provider) Référencer un service de transport. Reste en attente (pending)
+    tant que le compte n'est pas vérifié par un admin."""
     return await mobility_service.create_provider(data, owner_id=current_user.sub)
 
 

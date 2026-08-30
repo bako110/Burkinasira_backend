@@ -29,8 +29,12 @@ def _last_n_months(n: int) -> list:
 
 
 async def get_guide_analytics(guide_id: str, currency: str = "XOF") -> GuideAnalyticsSummary:
+    return await get_provider_analytics("guide", guide_id, currency)
+
+
+async def get_provider_analytics(item_type: str, item_id: str, currency: str = "XOF") -> GuideAnalyticsSummary:
     db = get_database()
-    query = {"item_type": "guide", "item_id": guide_id}
+    query = {"item_type": item_type, "item_id": item_id}
     docs = await db[COLLECTION].find(query).to_list(length=None)
 
     total_customers = len({d["customer_id"] for d in docs})
