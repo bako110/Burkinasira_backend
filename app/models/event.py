@@ -38,6 +38,7 @@ class Event(BaseModel):
     description: str
     category: EventCategory
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     address: Optional[str] = None

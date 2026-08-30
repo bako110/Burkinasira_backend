@@ -9,6 +9,7 @@ class CreateArtisanRequest(BaseModel):
     story: Optional[str] = None
     photo_url: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
 
 
@@ -17,6 +18,7 @@ class UpdateArtisanRequest(BaseModel):
     story: Optional[str] = None
     photo_url: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     city: Optional[str] = None
 
 
@@ -27,6 +29,7 @@ class ArtisanResponse(BaseModel):
     story: Optional[str] = None
     photo_url: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     is_verified: bool
     average_rating: float

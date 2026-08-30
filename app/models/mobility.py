@@ -29,6 +29,7 @@ class TransportProvider(BaseModel):
     type: TransportType
     description: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     base_location: Optional[GeoPoint] = None
     vehicle_info: Optional[str] = None

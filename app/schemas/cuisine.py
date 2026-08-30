@@ -11,6 +11,7 @@ class CreateRestaurantRequest(BaseModel):
     description: str = Field(..., min_length=10)
     cuisine_style: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     address: Optional[str] = None
@@ -31,6 +32,7 @@ class UpdateRestaurantRequest(BaseModel):
     description: Optional[str] = None
     cuisine_style: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     city: Optional[str] = None
     location: Optional[GeoPoint] = None
     address: Optional[str] = None
@@ -52,6 +54,7 @@ class RestaurantSummary(BaseModel):
     type: EstablishmentType
     cuisine_style: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     photo: Optional[str] = None
     dietary_tags: List[DietaryTag]
@@ -67,6 +70,7 @@ class RestaurantDetail(BaseModel):
     description: str
     cuisine_style: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     address: Optional[str] = None

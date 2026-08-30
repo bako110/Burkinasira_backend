@@ -23,6 +23,7 @@ def _to_summary(doc: dict) -> GuideSummary:
         languages=doc.get("languages", []),
         specialties=doc.get("specialties", []),
         regions_covered=doc.get("regions_covered", []),
+        provinces_covered=doc.get("provinces_covered", []),
         is_verified=doc.get("is_verified", False),
         average_rating=doc.get("average_rating", 0.0),
         review_count=doc.get("review_count", 0),
@@ -41,6 +42,7 @@ def _to_detail(doc: dict) -> GuideDetail:
         languages=doc.get("languages", []),
         specialties=doc.get("specialties", []),
         regions_covered=doc.get("regions_covered", []),
+        provinces_covered=doc.get("provinces_covered", []),
         certifications=doc.get("certifications", []),
         hourly_rate=doc.get("hourly_rate"),
         daily_rate=doc.get("daily_rate"),
@@ -83,6 +85,7 @@ async def create_guide_profile(data: CreateGuideProfileRequest, user_id: str) ->
 
 async def list_guides(
     region: Optional[str] = None,
+    province: Optional[str] = None,
     language: Optional[str] = None,
     specialty: Optional[str] = None,
     verified_only: bool = False,
@@ -95,6 +98,8 @@ async def list_guides(
 
     if region:
         query["regions_covered"] = region
+    if province:
+        query["provinces_covered"] = province
     if language:
         query["languages"] = language
     if specialty:

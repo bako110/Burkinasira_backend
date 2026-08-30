@@ -22,12 +22,13 @@ router = APIRouter(prefix="/culture", tags=["Culture, patrimoine et mémoire"])
 async def list_content(
     type: Optional[CultureContentType] = None,
     region: Optional[str] = None,
+    province: Optional[str] = None,
     q: Optional[str] = Query(default=None, description="Recherche texte (titre, résumé)"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ):
     """Histoire, patrimoine, traditions, contes, musique, guides audio/vidéo (§18)."""
-    return await story_service.list_content(type=type, region=region, q=q, page=page, page_size=page_size)
+    return await story_service.list_content(type=type, region=region, province=province, q=q, page=page, page_size=page_size)
 
 
 @router.get("/content/{content_id}", response_model=CultureContentDetail)
@@ -65,9 +66,9 @@ async def delete_content(
 
 
 @router.get("/routes", response_model=list)
-async def list_routes(region: Optional[str] = None):
+async def list_routes(region: Optional[str] = None, province: Optional[str] = None):
     """Parcours culturels disponibles (§18)."""
-    return await story_service.list_routes(region)
+    return await story_service.list_routes(region, province)
 
 
 @router.get("/routes/{route_id}", response_model=CulturalRouteResponse)

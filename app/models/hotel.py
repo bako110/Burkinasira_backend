@@ -45,6 +45,7 @@ class Hotel(BaseModel):
     type: AccommodationType
     description: str
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     address: Optional[str] = None

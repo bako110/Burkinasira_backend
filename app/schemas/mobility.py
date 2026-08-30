@@ -10,6 +10,7 @@ class CreateTransportProviderRequest(BaseModel):
     type: TransportType
     description: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     base_location: Optional[GeoPoint] = None
     vehicle_info: Optional[str] = None
@@ -22,6 +23,7 @@ class UpdateTransportProviderRequest(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     city: Optional[str] = None
     base_location: Optional[GeoPoint] = None
     vehicle_info: Optional[str] = None
@@ -35,6 +37,7 @@ class TransportProviderSummary(BaseModel):
     name: str
     type: TransportType
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     price_estimate: Optional[float] = None
     price_currency: str
@@ -50,6 +53,7 @@ class TransportProviderDetail(BaseModel):
     type: TransportType
     description: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     base_location: Optional[GeoPoint] = None
     vehicle_info: Optional[str] = None

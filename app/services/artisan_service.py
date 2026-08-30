@@ -32,6 +32,7 @@ def _artisan_to_response(doc: dict) -> ArtisanResponse:
         story=doc.get("story"),
         photo_url=doc.get("photo_url"),
         region=doc["region"],
+        province=doc.get("province"),
         city=doc.get("city"),
         is_verified=doc.get("is_verified", False),
         average_rating=doc.get("average_rating", 0.0),
@@ -61,12 +62,17 @@ async def create_artisan(data: CreateArtisanRequest, user_id: str) -> ArtisanRes
 
 
 async def list_artisans(
-    region: Optional[str] = None, verified_only: bool = False, include_all_statuses: bool = False
+    region: Optional[str] = None,
+    province: Optional[str] = None,
+    verified_only: bool = False,
+    include_all_statuses: bool = False,
 ) -> list:
     db = get_database()
     query: dict = {} if include_all_statuses else {"status": ArtisanStatus.ACTIVE.value}
     if region:
         query["region"] = region
+    if province:
+        query["province"] = province
     if verified_only:
         query["is_verified"] = True
     docs = await db[ARTISANS_COLLECTION].find(query).to_list(length=None)

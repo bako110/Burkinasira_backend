@@ -19,6 +19,7 @@ router = APIRouter(prefix="/restaurants", tags=["Restauration — GoTours Food"]
 async def list_restaurants(
     type: Optional[EstablishmentType] = None,
     region: Optional[str] = None,
+    province: Optional[str] = None,
     city: Optional[str] = None,
     dietary_tag: Optional[DietaryTag] = None,
     q: Optional[str] = Query(default=None, description="Recherche texte (nom, description, style)"),
@@ -27,7 +28,7 @@ async def list_restaurants(
 ):
     """Filtrer les restaurants (famille, végétarien, budget, proximité) (§8)."""
     return await cuisine_service.list_restaurants(
-        type=type, region=region, city=city, dietary_tag=dietary_tag,
+        type=type, region=region, province=province, city=city, dietary_tag=dietary_tag,
         q=q, page=page, page_size=page_size,
     )
 

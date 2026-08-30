@@ -19,6 +19,7 @@ router = APIRouter(prefix="/events", tags=["Événements et calendrier national"
 async def list_events(
     category: Optional[EventCategory] = None,
     region: Optional[str] = None,
+    province: Optional[str] = None,
     upcoming_only: bool = Query(default=True, description="Uniquement les événements à venir"),
     q: Optional[str] = Query(default=None, description="Recherche texte (titre, description)"),
     page: int = Query(default=1, ge=1),
@@ -26,7 +27,7 @@ async def list_events(
 ):
     """Rechercher / filtrer un événement (§17)."""
     return await event_service.list_events(
-        category=category, region=region, upcoming_only=upcoming_only,
+        category=category, region=region, province=province, upcoming_only=upcoming_only,
         q=q, page=page, page_size=page_size,
     )
 

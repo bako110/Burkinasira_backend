@@ -25,6 +25,7 @@ class GuideProfile(BaseModel):
     languages: List[str] = []
     specialties: List[str] = []
     regions_covered: List[str] = []
+    provinces_covered: List[str] = []
     certifications: List[Certification] = []
     hourly_rate: Optional[float] = None
     daily_rate: Optional[float] = None

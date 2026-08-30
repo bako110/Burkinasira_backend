@@ -26,6 +26,7 @@ def _to_summary(doc: dict) -> HotelSummary:
         name=doc["name"],
         type=doc["type"],
         region=doc["region"],
+        province=doc.get("province"),
         city=doc.get("city"),
         photo=doc["photos"][0] if doc.get("photos") else None,
         min_price=min(prices) if prices else None,
@@ -44,6 +45,7 @@ def _to_detail(doc: dict) -> HotelDetail:
         type=doc["type"],
         description=doc["description"],
         region=doc["region"],
+        province=doc.get("province"),
         city=doc.get("city"),
         location=doc["location"],
         address=doc.get("address"),
@@ -84,6 +86,7 @@ async def create_hotel(data: CreateHotelRequest, owner_id: str) -> HotelDetail:
 async def list_hotels(
     type: Optional[AccommodationType] = None,
     region: Optional[str] = None,
+    province: Optional[str] = None,
     city: Optional[str] = None,
     max_price: Optional[float] = None,
     amenity: Optional[str] = None,
@@ -98,6 +101,8 @@ async def list_hotels(
         query["type"] = type.value if isinstance(type, AccommodationType) else type
     if region:
         query["region"] = region
+    if province:
+        query["province"] = province
     if city:
         query["city"] = city
     if amenity:

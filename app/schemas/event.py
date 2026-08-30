@@ -10,6 +10,7 @@ class CreateEventRequest(BaseModel):
     description: str = Field(..., min_length=10)
     category: EventCategory
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     address: Optional[str] = None
@@ -29,6 +30,7 @@ class UpdateEventRequest(BaseModel):
     description: Optional[str] = None
     category: Optional[EventCategory] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     city: Optional[str] = None
     location: Optional[GeoPoint] = None
     address: Optional[str] = None
@@ -49,6 +51,7 @@ class EventSummary(BaseModel):
     title: str
     category: EventCategory
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     photo: Optional[str] = None
     start_date: datetime
@@ -65,6 +68,7 @@ class EventDetail(BaseModel):
     description: str
     category: EventCategory
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     address: Optional[str] = None

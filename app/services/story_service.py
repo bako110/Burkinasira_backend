@@ -28,6 +28,7 @@ def _content_to_summary(doc: dict) -> CultureContentSummary:
         summary=doc.get("summary"),
         cover_photo=doc.get("cover_photo"),
         region=doc.get("region"),
+        province=doc.get("province"),
     )
 
 
@@ -42,6 +43,7 @@ def _content_to_detail(doc: dict) -> CultureContentDetail:
         media_url=doc.get("media_url"),
         cover_photo=doc.get("cover_photo"),
         region=doc.get("region"),
+        province=doc.get("province"),
         related_destination_ids=doc.get("related_destination_ids", []),
         author=doc.get("author"),
         created_at=doc["created_at"],
@@ -64,6 +66,7 @@ async def create_content(data: CreateCultureContentRequest, created_by: str) -> 
 async def list_content(
     type: Optional[CultureContentType] = None,
     region: Optional[str] = None,
+    province: Optional[str] = None,
     q: Optional[str] = None,
     page: int = 1,
     page_size: int = 20,
@@ -74,6 +77,8 @@ async def list_content(
         query["type"] = type.value if isinstance(type, CultureContentType) else type
     if region:
         query["region"] = region
+    if province:
+        query["province"] = province
     if q:
         query["$or"] = [
             {"title": {"$regex": q, "$options": "i"}},
@@ -132,6 +137,7 @@ def _route_to_response(doc: dict) -> CulturalRouteResponse:
         title=doc["title"],
         description=doc.get("description"),
         region=doc.get("region"),
+        province=doc.get("province"),
         step_destination_ids=doc.get("step_destination_ids", []),
         step_content_ids=doc.get("step_content_ids", []),
         created_at=doc["created_at"],
@@ -150,11 +156,13 @@ async def create_route(data: CreateCulturalRouteRequest, created_by: str) -> Cul
     return _route_to_response(doc)
 
 
-async def list_routes(region: Optional[str] = None) -> list:
+async def list_routes(region: Optional[str] = None, province: Optional[str] = None) -> list:
     db = get_database()
     query: dict = {}
     if region:
         query["region"] = region
+    if province:
+        query["province"] = province
     docs = await db[ROUTES_COLLECTION].find(query).to_list(length=None)
     return [_route_to_response(d) for d in docs]
 

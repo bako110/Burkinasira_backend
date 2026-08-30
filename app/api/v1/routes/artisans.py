@@ -23,6 +23,7 @@ router = APIRouter(prefix="/market", tags=["Artisanat et marketplace — GoTours
 @router.get("/artisans", response_model=list)
 async def list_artisans(
     region: Optional[str] = None,
+    province: Optional[str] = None,
     verified_only: bool = False,
     include_all_statuses: bool = False,
     current_user: Optional[TokenPayload] = Depends(get_current_user_optional),
@@ -30,7 +31,7 @@ async def list_artisans(
     """Artisans vérifiés (§19)."""
     is_admin = current_user is not None and current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
     return await artisan_service.list_artisans(
-        region=region, verified_only=verified_only,
+        region=region, province=province, verified_only=verified_only,
         include_all_statuses=include_all_statuses and is_admin,
     )
 

@@ -35,6 +35,7 @@ class Artisan(BaseModel):
     story: Optional[str] = None  # histoire du fabricant
     photo_url: Optional[str] = None
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     is_verified: bool = False
     status: ArtisanStatus = ArtisanStatus.PENDING

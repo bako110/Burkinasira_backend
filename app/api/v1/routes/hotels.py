@@ -21,6 +21,7 @@ router = APIRouter(prefix="/hotels", tags=["Hébergements"])
 async def list_hotels(
     type: Optional[AccommodationType] = None,
     region: Optional[str] = None,
+    province: Optional[str] = None,
     city: Optional[str] = None,
     max_price: Optional[float] = None,
     amenity: Optional[str] = None,
@@ -30,7 +31,7 @@ async def list_hotels(
 ):
     """Rechercher / filtrer des hébergements (§7)."""
     return await hotel_service.list_hotels(
-        type=type, region=region, city=city, max_price=max_price,
+        type=type, region=region, province=province, city=city, max_price=max_price,
         amenity=amenity, q=q, page=page, page_size=page_size,
     )
 

@@ -10,6 +10,7 @@ class CreateHotelRequest(BaseModel):
     type: AccommodationType
     description: str = Field(..., min_length=10)
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     address: Optional[str] = None
@@ -25,6 +26,7 @@ class UpdateHotelRequest(BaseModel):
     type: Optional[AccommodationType] = None
     description: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     city: Optional[str] = None
     location: Optional[GeoPoint] = None
     address: Optional[str] = None
@@ -42,6 +44,7 @@ class HotelSummary(BaseModel):
     name: str
     type: AccommodationType
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     photo: Optional[str] = None
     min_price: Optional[float] = None
@@ -58,6 +61,7 @@ class HotelDetail(BaseModel):
     type: AccommodationType
     description: str
     region: str
+    province: Optional[str] = None
     city: Optional[str] = None
     location: GeoPoint
     address: Optional[str] = None

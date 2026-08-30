@@ -21,6 +21,7 @@ router = APIRouter(prefix="/guides", tags=["Guides touristiques"])
 @router.get("", response_model=GuideListResponse)
 async def list_guides(
     region: Optional[str] = None,
+    province: Optional[str] = None,
     language: Optional[str] = None,
     specialty: Optional[str] = None,
     verified_only: bool = False,
@@ -32,7 +33,7 @@ async def list_guides(
     """Rechercher des guides touristiques (§6)."""
     is_admin = current_user is not None and current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
     return await guide_service.list_guides(
-        region=region, language=language, specialty=specialty,
+        region=region, province=province, language=language, specialty=specialty,
         verified_only=verified_only, page=page, page_size=page_size,
         include_all_statuses=include_all_statuses and is_admin,
     )

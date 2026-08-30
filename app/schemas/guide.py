@@ -11,6 +11,7 @@ class CreateGuideProfileRequest(BaseModel):
     languages: List[str] = []
     specialties: List[str] = []
     regions_covered: List[str] = []
+    provinces_covered: List[str] = []
     certifications: List[Certification] = []
     hourly_rate: Optional[float] = None
     daily_rate: Optional[float] = None
@@ -24,6 +25,7 @@ class UpdateGuideProfileRequest(BaseModel):
     languages: Optional[List[str]] = None
     specialties: Optional[List[str]] = None
     regions_covered: Optional[List[str]] = None
+    provinces_covered: Optional[List[str]] = None
     certifications: Optional[List[Certification]] = None
     hourly_rate: Optional[float] = None
     daily_rate: Optional[float] = None
@@ -37,6 +39,7 @@ class GuideSummary(BaseModel):
     languages: List[str]
     specialties: List[str]
     regions_covered: List[str]
+    provinces_covered: List[str] = []
     is_verified: bool
     average_rating: float
     review_count: int
@@ -53,6 +56,7 @@ class GuideDetail(BaseModel):
     languages: List[str]
     specialties: List[str]
     regions_covered: List[str]
+    provinces_covered: List[str] = []
     certifications: List[Certification]
     hourly_rate: Optional[float] = None
     daily_rate: Optional[float] = None

@@ -22,6 +22,7 @@ router = APIRouter(prefix="/mobility", tags=["Transport et mobilité — GoTours
 async def list_providers(
     type: Optional[TransportType] = None,
     region: Optional[str] = None,
+    province: Optional[str] = None,
     include_all_statuses: bool = False,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -30,7 +31,7 @@ async def list_providers(
     """Rechercher un trajet : taxis/VTC, chauffeurs privés, location, transferts aéroport (§11)."""
     is_admin = current_user is not None and current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
     return await mobility_service.list_providers(
-        type=type, region=region, page=page, page_size=page_size,
+        type=type, region=region, province=province, page=page, page_size=page_size,
         include_all_statuses=include_all_statuses and is_admin,
     )
 

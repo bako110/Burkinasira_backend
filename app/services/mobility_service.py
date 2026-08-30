@@ -24,6 +24,7 @@ def _provider_to_summary(doc: dict) -> TransportProviderSummary:
         name=doc["name"],
         type=doc["type"],
         region=doc["region"],
+        province=doc.get("province"),
         city=doc.get("city"),
         price_estimate=doc.get("price_estimate"),
         price_currency=doc.get("price_currency", "XOF"),
@@ -41,6 +42,7 @@ def _provider_to_detail(doc: dict) -> TransportProviderDetail:
         type=doc["type"],
         description=doc.get("description"),
         region=doc["region"],
+        province=doc.get("province"),
         city=doc.get("city"),
         base_location=doc.get("base_location"),
         vehicle_info=doc.get("vehicle_info"),
@@ -74,6 +76,7 @@ async def create_provider(data: CreateTransportProviderRequest, owner_id: str) -
 async def list_providers(
     type: Optional[TransportType] = None,
     region: Optional[str] = None,
+    province: Optional[str] = None,
     include_all_statuses: bool = False,
     page: int = 1,
     page_size: int = 20,
@@ -84,6 +87,8 @@ async def list_providers(
         query["type"] = type.value if isinstance(type, TransportType) else type
     if region:
         query["region"] = region
+    if province:
+        query["province"] = province
 
     total = await db[PROVIDERS_COLLECTION].count_documents(query)
     skip = (page - 1) * page_size

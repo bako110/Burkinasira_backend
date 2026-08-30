@@ -13,6 +13,7 @@ class CreateCultureContentRequest(BaseModel):
     media_url: Optional[str] = None
     cover_photo: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     related_destination_ids: List[str] = []
     author: Optional[str] = None
 
@@ -26,6 +27,7 @@ class UpdateCultureContentRequest(BaseModel):
     media_url: Optional[str] = None
     cover_photo: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     related_destination_ids: Optional[List[str]] = None
     author: Optional[str] = None
 
@@ -38,6 +40,7 @@ class CultureContentSummary(BaseModel):
     summary: Optional[str] = None
     cover_photo: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
 
 
 class CultureContentDetail(BaseModel):
@@ -50,6 +53,7 @@ class CultureContentDetail(BaseModel):
     media_url: Optional[str] = None
     cover_photo: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     related_destination_ids: List[str]
     author: Optional[str] = None
     created_at: datetime
@@ -67,6 +71,7 @@ class CreateCulturalRouteRequest(BaseModel):
     title: str = Field(..., min_length=2, max_length=200)
     description: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     step_destination_ids: List[str] = []
     step_content_ids: List[str] = []
 
@@ -75,6 +80,7 @@ class UpdateCulturalRouteRequest(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     step_destination_ids: Optional[List[str]] = None
     step_content_ids: Optional[List[str]] = None
 
@@ -84,6 +90,7 @@ class CulturalRouteResponse(BaseModel):
     title: str
     description: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     step_destination_ids: List[str]
     step_content_ids: List[str]
     created_at: datetime

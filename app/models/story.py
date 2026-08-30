@@ -35,6 +35,7 @@ class CultureContent(BaseModel):
     media_url: Optional[str] = None  # audio/vidéo
     cover_photo: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     related_destination_ids: List[str] = []
     author: Optional[str] = None
     created_by: str
@@ -52,6 +53,7 @@ class CulturalRoute(BaseModel):
     title: str
     description: Optional[str] = None
     region: Optional[str] = None
+    province: Optional[str] = None
     step_destination_ids: List[str] = []
     step_content_ids: List[str] = []
     created_by: str

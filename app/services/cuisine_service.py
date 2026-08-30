@@ -22,6 +22,7 @@ def _to_summary(doc: dict) -> RestaurantSummary:
         type=doc["type"],
         cuisine_style=doc.get("cuisine_style"),
         region=doc["region"],
+        province=doc.get("province"),
         city=doc.get("city"),
         photo=doc["photos"][0] if doc.get("photos") else None,
         dietary_tags=doc.get("dietary_tags", []),
@@ -39,6 +40,7 @@ def _to_detail(doc: dict) -> RestaurantDetail:
         description=doc["description"],
         cuisine_style=doc.get("cuisine_style"),
         region=doc["region"],
+        province=doc.get("province"),
         city=doc.get("city"),
         location=doc["location"],
         address=doc.get("address"),
@@ -81,6 +83,7 @@ async def create_restaurant(data: CreateRestaurantRequest, owner_id: str) -> Res
 async def list_restaurants(
     type: Optional[EstablishmentType] = None,
     region: Optional[str] = None,
+    province: Optional[str] = None,
     city: Optional[str] = None,
     dietary_tag: Optional[DietaryTag] = None,
     q: Optional[str] = None,
@@ -94,6 +97,8 @@ async def list_restaurants(
         query["type"] = type.value if isinstance(type, EstablishmentType) else type
     if region:
         query["region"] = region
+    if province:
+        query["province"] = province
     if city:
         query["city"] = city
     if dietary_tag:

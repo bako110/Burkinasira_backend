@@ -21,6 +21,7 @@ def _to_summary(doc: dict) -> EventSummary:
         title=doc["title"],
         category=doc["category"],
         region=doc["region"],
+        province=doc.get("province"),
         city=doc.get("city"),
         photo=doc["photos"][0] if doc.get("photos") else None,
         start_date=doc["start_date"],
@@ -39,6 +40,7 @@ def _to_detail(doc: dict) -> EventDetail:
         description=doc["description"],
         category=doc["category"],
         region=doc["region"],
+        province=doc.get("province"),
         city=doc.get("city"),
         location=doc["location"],
         address=doc.get("address"),
@@ -74,6 +76,7 @@ async def create_event(data: CreateEventRequest, organizer_id: str) -> EventDeta
 async def list_events(
     category: Optional[EventCategory] = None,
     region: Optional[str] = None,
+    province: Optional[str] = None,
     upcoming_only: bool = True,
     q: Optional[str] = None,
     page: int = 1,
@@ -85,6 +88,8 @@ async def list_events(
         query["category"] = category.value if isinstance(category, EventCategory) else category
     if region:
         query["region"] = region
+    if province:
+        query["province"] = province
     if upcoming_only:
         query["start_date"] = {"$gte": datetime.utcnow()}
     if q:
