@@ -34,6 +34,9 @@ class Artisan(BaseModel):
     display_name: str
     story: Optional[str] = None  # histoire du fabricant
     photo_url: Optional[str] = None
+    photos: List[str] = []
+    videos: List[str] = []
+    photos_360: List[str] = []
     region: str
     province: Optional[str] = None
     city: Optional[str] = None
@@ -65,6 +68,7 @@ class Product(BaseModel):
     price: float
     currency: str = "XOF"
     photos: List[str] = []
+    videos: List[str] = []
     stock_quantity: int = 0
     fulfillment_mode: FulfillmentMode = FulfillmentMode.LES_DEUX
     average_rating: float = 0.0

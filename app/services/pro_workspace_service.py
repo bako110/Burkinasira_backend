@@ -129,18 +129,30 @@ def _team_member_to_response(doc: dict) -> TeamMemberResponse:
         user_id=doc.get("user_id"),
         email=doc["email"],
         role=doc.get("role", "staff"),
+        establishment_type=doc.get("establishment_type"),
+        establishment_id=doc.get("establishment_id"),
         is_active=doc.get("is_active", True),
     )
 
 
 async def invite_team_member(data: InviteTeamMemberRequest, provider_id: str) -> TeamMemberResponse:
     db = get_database()
+
+    if data.establishment_type and data.establishment_id:
+        from app.services.booking_provider_resolver import resolve_owner_id
+
+        owner_id = await resolve_owner_id(data.establishment_type, data.establishment_id)
+        if owner_id != provider_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cet établissement ne vous appartient pas")
+
     existing_user = await db["users"].find_one({"email": data.email.lower()})
     doc = {
         "provider_id": provider_id,
         "user_id": str(existing_user["_id"]) if existing_user else None,
         "email": data.email.lower(),
         "role": data.role.value,
+        "establishment_type": data.establishment_type,
+        "establishment_id": data.establishment_id,
         "is_active": True,
         "created_at": datetime.utcnow(),
     }
@@ -149,9 +161,13 @@ async def invite_team_member(data: InviteTeamMemberRequest, provider_id: str) ->
     return _team_member_to_response(doc)
 
 
-async def list_team_members(provider_id: str) -> list:
+async def list_team_members(provider_id: str, establishment_type: str = None, establishment_id: str = None) -> list:
     db = get_database()
-    docs = await db[TEAM_COLLECTION].find({"provider_id": provider_id}).to_list(length=None)
+    query: dict = {"provider_id": provider_id}
+    if establishment_type and establishment_id:
+        query["establishment_type"] = establishment_type
+        query["establishment_id"] = establishment_id
+    docs = await db[TEAM_COLLECTION].find(query).to_list(length=None)
     return [_team_member_to_response(d) for d in docs]
 
 

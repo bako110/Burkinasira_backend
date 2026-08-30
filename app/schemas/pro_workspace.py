@@ -41,6 +41,8 @@ class PromotionResponse(BaseModel):
 class InviteTeamMemberRequest(BaseModel):
     email: str
     role: TeamMemberRole = TeamMemberRole.STAFF
+    establishment_type: Optional[str] = None
+    establishment_id: Optional[str] = None
 
 
 class TeamMemberResponse(BaseModel):
@@ -49,4 +51,6 @@ class TeamMemberResponse(BaseModel):
     user_id: Optional[str] = None
     email: str
     role: TeamMemberRole
+    establishment_type: Optional[str] = None
+    establishment_id: Optional[str] = None
     is_active: bool

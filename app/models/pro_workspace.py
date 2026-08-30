@@ -36,12 +36,15 @@ class TeamMemberRole(str, Enum):
 
 
 class TeamMember(BaseModel):
-    """Membre d'équipe rattaché à un compte professionnel."""
+    """Membre d'équipe rattaché à un compte professionnel, et éventuellement
+    limité à un seul établissement (ex: le gérant d'une agence/succursale précise)."""
     id: Optional[str] = Field(default=None, alias="_id")
     provider_id: str
     user_id: Optional[str] = None  # None si invitation en attente (pas encore de compte)
     email: str
     role: TeamMemberRole = TeamMemberRole.STAFF
+    establishment_type: Optional[str] = None  # "hotel" | "restaurant" | "transport" | "product" ; None = tout le portefeuille
+    establishment_id: Optional[str] = None
     is_active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

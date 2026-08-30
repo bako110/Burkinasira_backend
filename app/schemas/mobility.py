@@ -14,6 +14,9 @@ class CreateTransportProviderRequest(BaseModel):
     city: Optional[str] = None
     base_location: Optional[GeoPoint] = None
     vehicle_info: Optional[str] = None
+    photos: List[str] = []
+    videos: List[str] = []
+    photos_360: List[str] = []
     price_estimate: Optional[float] = None
     price_currency: str = "XOF"
     contact_phone: str
@@ -27,6 +30,9 @@ class UpdateTransportProviderRequest(BaseModel):
     city: Optional[str] = None
     base_location: Optional[GeoPoint] = None
     vehicle_info: Optional[str] = None
+    photos: Optional[List[str]] = None
+    videos: Optional[List[str]] = None
+    photos_360: Optional[List[str]] = None
     price_estimate: Optional[float] = None
     price_currency: Optional[str] = None
     contact_phone: Optional[str] = None
@@ -39,6 +45,7 @@ class TransportProviderSummary(BaseModel):
     region: str
     province: Optional[str] = None
     city: Optional[str] = None
+    photo: Optional[str] = None
     price_estimate: Optional[float] = None
     price_currency: str
     is_verified: bool
@@ -57,6 +64,9 @@ class TransportProviderDetail(BaseModel):
     city: Optional[str] = None
     base_location: Optional[GeoPoint] = None
     vehicle_info: Optional[str] = None
+    photos: List[str]
+    videos: List[str]
+    photos_360: List[str]
     price_estimate: Optional[float] = None
     price_currency: str
     contact_phone: str

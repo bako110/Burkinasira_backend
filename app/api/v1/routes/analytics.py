@@ -6,7 +6,7 @@ from app.schemas.auth import TokenPayload
 from app.schemas.analytics import TouristAnalyticsSummary, ProAnalyticsSummary
 from app.schemas.guide_analytics import GuideAnalyticsSummary
 from app.services import analytics_service, guide_analytics_service
-from app.services.booking_provider_resolver import resolve_owner_id
+from app.services.booking_provider_resolver import is_authorized_for_establishment
 
 router = APIRouter(prefix="/analytics", tags=["Analytics tourisme"])
 
@@ -14,9 +14,9 @@ PROVIDER_ITEM_TYPES = {"hotel", "restaurant", "transport", "product"}
 
 
 async def _assert_owns_item(item_type: str, item_id: str, user_id: str) -> None:
-    """Vérifie que l'item appartient bien au provider connecté avant de lui exposer ses données."""
-    owner_id = await resolve_owner_id(item_type, item_id)
-    if owner_id is None or owner_id != user_id:
+    """Vérifie que l'item appartient au provider connecté (ou qu'il y est rattaché comme
+    membre d'équipe) avant de lui exposer ses données."""
+    if not await is_authorized_for_establishment(item_type, item_id, user_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cet établissement ne vous appartient pas")
 
 

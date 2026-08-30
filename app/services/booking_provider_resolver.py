@@ -48,3 +48,20 @@ async def resolve_provider_id(item_type: str, item_id: str) -> str | None:
     if not doc:
         return None
     return doc.get(owner_field)
+
+
+async def is_authorized_for_establishment(item_type: str, item_id: str, user_id: str) -> bool:
+    """Vrai si user_id est le propriétaire de l'établissement, ou un membre d'équipe
+    actif spécifiquement rattaché à ce même établissement (ex: gérant d'une succursale)."""
+    owner_id = await resolve_owner_id(item_type, item_id)
+    if owner_id == user_id:
+        return True
+
+    db = get_database()
+    member = await db["pro_team_members"].find_one({
+        "user_id": user_id,
+        "establishment_type": item_type,
+        "establishment_id": item_id,
+        "is_active": True,
+    })
+    return member is not None

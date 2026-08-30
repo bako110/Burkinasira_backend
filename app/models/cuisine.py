@@ -46,6 +46,8 @@ class Restaurant(BaseModel):
     location: GeoPoint
     address: Optional[str] = None
     photos: List[str] = []
+    videos: List[str] = []
+    photos_360: List[str] = []
     opening_hours: List[OpeningHours] = []
     menu: List[MenuItem] = []
     dietary_tags: List[DietaryTag] = []

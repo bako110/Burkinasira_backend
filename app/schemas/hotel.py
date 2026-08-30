@@ -15,6 +15,8 @@ class CreateHotelRequest(BaseModel):
     location: GeoPoint
     address: Optional[str] = None
     photos: List[str] = []
+    videos: List[str] = []
+    photos_360: List[str] = []
     amenities: List[str] = []
     room_types: List[RoomType] = []
     contact_phone: Optional[str] = None
@@ -31,6 +33,8 @@ class UpdateHotelRequest(BaseModel):
     location: Optional[GeoPoint] = None
     address: Optional[str] = None
     photos: Optional[List[str]] = None
+    videos: Optional[List[str]] = None
+    photos_360: Optional[List[str]] = None
     amenities: Optional[List[str]] = None
     room_types: Optional[List[RoomType]] = None
     offers: Optional[List[Offer]] = None
@@ -66,6 +70,8 @@ class HotelDetail(BaseModel):
     location: GeoPoint
     address: Optional[str] = None
     photos: List[str]
+    videos: List[str]
+    photos_360: List[str]
     amenities: List[str]
     room_types: List[RoomType]
     offers: List[Offer]

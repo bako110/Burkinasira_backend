@@ -45,6 +45,8 @@ def _to_detail(doc: dict) -> RestaurantDetail:
         location=doc["location"],
         address=doc.get("address"),
         photos=doc.get("photos", []),
+        videos=doc.get("videos", []),
+        photos_360=doc.get("photos_360", []),
         opening_hours=doc.get("opening_hours", []),
         menu=doc.get("menu", []),
         dietary_tags=doc.get("dietary_tags", []),

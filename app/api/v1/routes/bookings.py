@@ -11,7 +11,7 @@ from app.schemas.booking import (
     InvoiceResponse,
 )
 from app.services import booking_service
-from app.services.booking_provider_resolver import resolve_owner_id
+from app.services.booking_provider_resolver import is_authorized_for_establishment
 
 router = APIRouter(prefix="/bookings", tags=["Réservation et billetterie"])
 
@@ -54,8 +54,7 @@ async def list_received_bookings(
     if item_type not in PROVIDER_ITEM_TYPES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Type d'activité invalide")
     if current_user.role != UserRole.ADMIN:
-        owner_id = await resolve_owner_id(item_type, item_id)
-        if owner_id is None or owner_id != current_user.sub:
+        if not await is_authorized_for_establishment(item_type, item_id, current_user.sub):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cet établissement ne vous appartient pas")
     return await booking_service.list_provider_bookings(item_type, item_id, status_filter)
 

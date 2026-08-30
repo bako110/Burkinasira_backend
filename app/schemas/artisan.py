@@ -8,6 +8,9 @@ class CreateArtisanRequest(BaseModel):
     display_name: str = Field(..., min_length=2, max_length=150)
     story: Optional[str] = None
     photo_url: Optional[str] = None
+    photos: List[str] = []
+    videos: List[str] = []
+    photos_360: List[str] = []
     region: str
     province: Optional[str] = None
     city: Optional[str] = None
@@ -17,6 +20,9 @@ class UpdateArtisanRequest(BaseModel):
     display_name: Optional[str] = None
     story: Optional[str] = None
     photo_url: Optional[str] = None
+    photos: Optional[List[str]] = None
+    videos: Optional[List[str]] = None
+    photos_360: Optional[List[str]] = None
     region: Optional[str] = None
     province: Optional[str] = None
     city: Optional[str] = None
@@ -28,6 +34,9 @@ class ArtisanResponse(BaseModel):
     display_name: str
     story: Optional[str] = None
     photo_url: Optional[str] = None
+    photos: List[str] = []
+    videos: List[str] = []
+    photos_360: List[str] = []
     region: str
     province: Optional[str] = None
     city: Optional[str] = None
@@ -45,6 +54,7 @@ class CreateProductRequest(BaseModel):
     price: float = Field(..., gt=0)
     currency: str = "XOF"
     photos: List[str] = []
+    videos: List[str] = []
     stock_quantity: int = Field(default=0, ge=0)
     fulfillment_mode: FulfillmentMode = FulfillmentMode.LES_DEUX
     artisan_id: Optional[str] = None
@@ -57,6 +67,7 @@ class UpdateProductRequest(BaseModel):
     price: Optional[float] = None
     currency: Optional[str] = None
     photos: Optional[List[str]] = None
+    videos: Optional[List[str]] = None
     stock_quantity: Optional[int] = None
     fulfillment_mode: Optional[FulfillmentMode] = None
     status: Optional[ProductStatus] = None
@@ -84,6 +95,7 @@ class ProductDetail(BaseModel):
     price: float
     currency: str
     photos: List[str]
+    videos: List[str]
     stock_quantity: int
     fulfillment_mode: FulfillmentMode
     average_rating: float

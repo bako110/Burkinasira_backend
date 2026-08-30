@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, status
+from typing import Optional
+from fastapi import APIRouter, Depends, Query, status
 from app.core.security import require_role
 from app.models.user import UserRole
 from app.schemas.auth import TokenPayload
@@ -50,10 +51,12 @@ async def invite_team_member(
 
 @router.get("/team", response_model=list)
 async def list_team_members(
+    establishment_type: Optional[str] = Query(default=None),
+    establishment_id: Optional[str] = Query(default=None),
     current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
 ):
-    """Liste des membres d'équipe."""
-    return await pro_workspace_service.list_team_members(current_user.sub)
+    """Liste des membres d'équipe. Filtrée à un établissement précis si fourni."""
+    return await pro_workspace_service.list_team_members(current_user.sub, establishment_type, establishment_id)
 
 
 @router.delete("/team/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
