@@ -81,6 +81,7 @@ class ProductSummary(BaseModel):
     average_rating: float
     review_count: int
     in_stock: bool
+    stock_quantity: int
 
 
 class ProductDetail(BaseModel):

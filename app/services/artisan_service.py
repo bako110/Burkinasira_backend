@@ -211,6 +211,7 @@ def _product_to_summary(doc: dict) -> ProductSummary:
         average_rating=doc.get("average_rating", 0.0),
         review_count=doc.get("review_count", 0),
         in_stock=doc.get("stock_quantity", 0) > 0,
+        stock_quantity=doc.get("stock_quantity", 0),
     )
 
 
