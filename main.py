@@ -65,7 +65,7 @@ async def shutdown_event():
 @app.get("/health", tags=["Health"])
 async def health_check():
     """Vérifier l'état de l'application"""
-    return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
+    return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION, "deployed_via": "webhook"}
 
 
 # ============================================
