@@ -27,6 +27,7 @@ class PostResponse(BaseModel):
     location: Optional[GeoPoint] = None
     like_count: int
     comment_count: int
+    is_liked_by_me: bool = False
     created_at: datetime
 
 

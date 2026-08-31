@@ -24,6 +24,7 @@ from app.schemas.community import (
 )
 
 POSTS_COLLECTION = "community_posts"
+POST_LIKES_COLLECTION = "community_post_likes"
 COMMENTS_COLLECTION = "community_comments"
 FAVORITES_COLLECTION = "favorite_lists"
 GROUPS_COLLECTION = "traveler_groups"
@@ -35,7 +36,7 @@ USERS_COLLECTION = "users"
 
 # --- Publications ---
 
-def _post_to_response(doc: dict, author_doc: Optional[dict] = None) -> PostResponse:
+def _post_to_response(doc: dict, author_doc: Optional[dict] = None, is_liked_by_me: bool = False) -> PostResponse:
     return PostResponse(
         id=str(doc["_id"]),
         author_id=doc["author_id"],
@@ -49,6 +50,7 @@ def _post_to_response(doc: dict, author_doc: Optional[dict] = None) -> PostRespo
         location=doc.get("location"),
         like_count=doc.get("like_count", 0),
         comment_count=doc.get("comment_count", 0),
+        is_liked_by_me=is_liked_by_me,
         created_at=doc["created_at"],
     )
 
@@ -88,6 +90,7 @@ async def list_posts(
     group_id: Optional[str] = None,
     page: int = 1,
     page_size: int = 20,
+    current_user_id: Optional[str] = None,
 ) -> dict:
     db = get_database()
     query: dict = {"status": PostStatus.PUBLISHED.value}
@@ -104,19 +107,44 @@ async def list_posts(
     author_docs = await db[USERS_COLLECTION].find({"_id": {"$in": [ObjectId(a) for a in author_ids]}}).to_list(length=None)
     authors_by_id = {str(a["_id"]): a for a in author_docs}
 
-    items = [_post_to_response(d, authors_by_id.get(d["author_id"])) for d in docs]
+    liked_post_ids: set = set()
+    if current_user_id and docs:
+        post_ids = [str(d["_id"]) for d in docs]
+        like_docs = await db[POST_LIKES_COLLECTION].find(
+            {"user_id": current_user_id, "post_id": {"$in": post_ids}}
+        ).to_list(length=None)
+        liked_post_ids = {d["post_id"] for d in like_docs}
+
+    items = [
+        _post_to_response(d, authors_by_id.get(d["author_id"]), is_liked_by_me=str(d["_id"]) in liked_post_ids)
+        for d in docs
+    ]
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
-async def like_post(post_id: str) -> PostResponse:
+async def toggle_like_post(post_id: str, user_id: str) -> PostResponse:
+    """Bascule le like d'un utilisateur sur une publication (like si absent, unlike si déjà présent)."""
     db = get_database()
     if not ObjectId.is_valid(post_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Publication introuvable")
-    result = await db[POSTS_COLLECTION].update_one({"_id": ObjectId(post_id)}, {"$inc": {"like_count": 1}})
-    if result.matched_count == 0:
+    post_doc = await db[POSTS_COLLECTION].find_one({"_id": ObjectId(post_id)})
+    if not post_doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Publication introuvable")
+
+    existing_like = await db[POST_LIKES_COLLECTION].find_one({"post_id": post_id, "user_id": user_id})
+    if existing_like:
+        await db[POST_LIKES_COLLECTION].delete_one({"_id": existing_like["_id"]})
+        await db[POSTS_COLLECTION].update_one({"_id": ObjectId(post_id)}, {"$inc": {"like_count": -1}})
+        is_liked_by_me = False
+    else:
+        await db[POST_LIKES_COLLECTION].insert_one(
+            {"post_id": post_id, "user_id": user_id, "created_at": datetime.utcnow()}
+        )
+        await db[POSTS_COLLECTION].update_one({"_id": ObjectId(post_id)}, {"$inc": {"like_count": 1}})
+        is_liked_by_me = True
+
     doc = await db[POSTS_COLLECTION].find_one({"_id": ObjectId(post_id)})
-    return _post_to_response(doc)
+    return _post_to_response(doc, is_liked_by_me=is_liked_by_me)
 
 
 async def delete_post(post_id: str, current_user_id: str, is_admin: bool) -> None:
@@ -351,7 +379,7 @@ async def get_group_detail(group_id: str) -> GroupDetailResponse:
     members = [
         GroupMemberPublic(
             id=uid,
-            full_name=users_by_id[uid]["full_name"] if uid in users_by_id else "Utilisateur GoTours",
+            full_name=users_by_id[uid]["full_name"] if uid in users_by_id else "Utilisateur FasoViva",
             avatar_url=users_by_id[uid].get("avatar_url") if uid in users_by_id else None,
         )
         for uid in member_ids

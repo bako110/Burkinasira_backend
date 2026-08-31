@@ -1,6 +1,6 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, Query, status
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, get_current_user_optional, require_role
 from app.models.user import UserRole
 from app.models.community import QuestionStatus
 from app.schemas.auth import TokenPayload
@@ -35,10 +35,16 @@ async def list_posts(
     group_id: Optional[str] = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    current_user: Optional[TokenPayload] = Depends(get_current_user_optional),
 ):
-    """Photos, vidéos, carnets de voyage, recommandations (§27). Filtrable par groupe via group_id."""
+    """Photos, vidéos, carnets de voyage, recommandations (§27). Filtrable par groupe via group_id.
+    Sans group_id : fil public global visible par tous."""
     return await community_service.list_posts(
-        author_id=author_id, group_id=group_id, page=page, page_size=page_size
+        author_id=author_id,
+        group_id=group_id,
+        page=page,
+        page_size=page_size,
+        current_user_id=current_user.sub if current_user else None,
     )
 
 
@@ -53,8 +59,8 @@ async def create_post(
 
 @router.post("/posts/{post_id}/like", response_model=PostResponse)
 async def like_post(post_id: str, current_user: TokenPayload = Depends(get_current_user)):
-    """Recommander un lieu / aimer une publication."""
-    return await community_service.like_post(post_id)
+    """Aimer/retirer son like sur une publication (bascule selon l'état actuel)."""
+    return await community_service.toggle_like_post(post_id, current_user.sub)
 
 
 @router.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
