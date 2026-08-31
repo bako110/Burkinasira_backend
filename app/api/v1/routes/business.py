@@ -16,7 +16,7 @@ from app.schemas.business import (
 )
 from app.services import business_service
 
-router = APIRouter(prefix="/business", tags=["Tourisme d'affaires — GoTours Business"])
+router = APIRouter(prefix="/business", tags=["Tourisme d'affaires — FasoViva Business"])
 
 
 @router.post("/quotes", response_model=QuoteRequestResponse, status_code=status.HTTP_201_CREATED)

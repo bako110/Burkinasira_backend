@@ -55,7 +55,7 @@ class WalletTransactionStatus(str, Enum):
 
 
 class Wallet(BaseModel):
-    """Portefeuille GoTours (§13, lecture seule au Lot 1)."""
+    """Portefeuille FasoViva (§13, lecture seule au Lot 1)."""
     id: Optional[str] = Field(default=None, alias="_id")
     user_id: str
     balance: float = 0.0

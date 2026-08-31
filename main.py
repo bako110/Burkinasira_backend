@@ -95,7 +95,7 @@ app.include_router(guide_availability.router, prefix=settings.API_V1_PREFIX + "/
 app.include_router(hotels.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES RESTAURATION — GOTOURS FOOD (§8)
+# ROUTES RESTAURATION — FASOVIVA FOOD (§8)
 # ============================================
 app.include_router(cuisines.router, prefix=settings.API_V1_PREFIX)
 
@@ -151,7 +151,7 @@ app.include_router(events.router, prefix=settings.API_V1_PREFIX)
 app.include_router(stories.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES ARTISANAT ET MARKETPLACE — GOTOURS MARKET (§19)
+# ROUTES ARTISANAT ET MARKETPLACE — FASOVIVA MARKET (§19)
 # ============================================
 app.include_router(artisans.router, prefix=settings.API_V1_PREFIX)
 
@@ -186,7 +186,7 @@ app.include_router(weather.router, prefix=settings.API_V1_PREFIX)
 app.include_router(trips.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES IA — GOTOURS AI (§26)
+# ROUTES IA — FASOVIVA AI (§26)
 # ============================================
 app.include_router(ai_assistant.router, prefix=settings.API_V1_PREFIX)
 
@@ -196,17 +196,17 @@ app.include_router(ai_assistant.router, prefix=settings.API_V1_PREFIX)
 app.include_router(community.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES PASSEPORT GOTOURS ET GAMIFICATION (§28)
+# ROUTES PASSEPORT FASOVIVA ET GAMIFICATION (§28)
 # ============================================
 app.include_router(passport.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES TOURISME D'AFFAIRES — GOTOURS BUSINESS (§29)
+# ROUTES TOURISME D'AFFAIRES — FASOVIVA BUSINESS (§29)
 # ============================================
 app.include_router(business.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES TOURISME ÉDUCATIF — GOTOURS EDU (§30)
+# ROUTES TOURISME ÉDUCATIF — FASOVIVA EDU (§30)
 # ============================================
 app.include_router(edu.router, prefix=settings.API_V1_PREFIX)
 
@@ -241,7 +241,7 @@ app.include_router(pro_workspace.router, prefix=settings.API_V1_PREFIX)
 app.include_router(operators.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES GOTOURS VERIFIED — CONFIANCE (§37)
+# ROUTES FASOVIVA VERIFIED — CONFIANCE (§37)
 # ============================================
 app.include_router(verified.router, prefix=settings.API_V1_PREFIX)
 
@@ -271,7 +271,7 @@ app.include_router(notifications.router, prefix=settings.API_V1_PREFIX)
 app.include_router(offline.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES ADMINISTRATION GOTOURS (§43)
+# ROUTES ADMINISTRATION FASOVIVA (§43)
 # ============================================
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 
@@ -306,7 +306,7 @@ app.include_router(home.router, prefix=settings.API_V1_PREFIX)
 app.include_router(media.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES AVIS CLIENTS (§37 GoTours Verified)
+# ROUTES AVIS CLIENTS (§37 FasoViva Verified)
 # ============================================
 app.include_router(reviews.router, prefix=settings.API_V1_PREFIX)
 
@@ -315,7 +315,7 @@ app.include_router(reviews.router, prefix=settings.API_V1_PREFIX)
 # ============================================
 app.include_router(ws.router)
 
-# Les 47 domaines fonctionnels du cahier GoTours (§2 à §47) sont désormais
+# Les 47 domaines fonctionnels du cahier FasoViva (§2 à §47) sont désormais
 # tous reconstruits et câblés.
 
 

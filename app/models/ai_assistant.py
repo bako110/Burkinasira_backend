@@ -28,7 +28,7 @@ class AIMessage(BaseModel):
 
 
 class AIConversation(BaseModel):
-    """Fil de discussion avec l'assistant GoTours AI (§26)."""
+    """Fil de discussion avec l'assistant FasoViva AI (§26)."""
     id: Optional[str] = Field(default=None, alias="_id")
     user_id: str
     type: AIConversationType = AIConversationType.GENERAL

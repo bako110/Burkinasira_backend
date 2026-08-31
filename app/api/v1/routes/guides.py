@@ -134,7 +134,7 @@ async def verify_guide(
     is_verified: bool = True,
     current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
 ):
-    """(Admin) Vérifier un guide (§37 GoTours Verified)."""
+    """(Admin) Vérifier un guide (§37 FasoViva Verified)."""
     return await guide_service.set_verification_status(guide_id, is_verified)
 
 

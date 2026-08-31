@@ -145,22 +145,30 @@ async def delete_artisan(user_id: str, is_admin: bool = False, target_artisan_id
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profil artisan introuvable")
 
 
-OFFICIAL_ARTISAN_NAME = "GoTours"
+OFFICIAL_ARTISAN_NAME = "FasoViva"
+_LEGACY_OFFICIAL_ARTISAN_NAME = "GoTours"
 
 
 async def get_or_create_official_artisan(admin_user_id: str) -> ArtisanResponse:
     """Profil artisan officiel utilisé pour les produits ajoutés directement par l'admin,
-    sans artisan associé (vitrine GoTours)."""
+    sans artisan associé (vitrine FasoViva)."""
     db = get_database()
-    doc = await db[ARTISANS_COLLECTION].find_one({"display_name": OFFICIAL_ARTISAN_NAME, "user_id": admin_user_id})
+    doc = await db[ARTISANS_COLLECTION].find_one(
+        {"display_name": {"$in": [OFFICIAL_ARTISAN_NAME, _LEGACY_OFFICIAL_ARTISAN_NAME]}, "user_id": admin_user_id}
+    )
     if doc:
+        if doc["display_name"] != OFFICIAL_ARTISAN_NAME:
+            await db[ARTISANS_COLLECTION].update_one(
+                {"_id": doc["_id"]}, {"$set": {"display_name": OFFICIAL_ARTISAN_NAME}}
+            )
+            doc["display_name"] = OFFICIAL_ARTISAN_NAME
         return _artisan_to_response(doc)
 
     now = datetime.utcnow()
     doc = {
         "user_id": admin_user_id,
         "display_name": OFFICIAL_ARTISAN_NAME,
-        "story": "Produits proposés directement par la plateforme GoTours.",
+        "story": "Produits proposés directement par la plateforme FasoViva.",
         "photo_url": None,
         "region": "Centre",
         "city": None,

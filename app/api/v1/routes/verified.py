@@ -18,7 +18,7 @@ from app.schemas.verified import (
 )
 from app.services import verified_service
 
-router = APIRouter(prefix="/verified", tags=["GoTours Verified — confiance"])
+router = APIRouter(prefix="/verified", tags=["FasoViva Verified — confiance"])
 
 
 @router.post("/verification-requests", response_model=VerificationRequestResponse, status_code=status.HTTP_201_CREATED)

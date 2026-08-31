@@ -45,7 +45,7 @@ async def convert_currency(data: CurrencyConversionRequest):
 
 @router.get("/wallet/me", response_model=WalletResponse)
 async def get_my_wallet(current_user: TokenPayload = Depends(get_current_user)):
-    """Consulter son portefeuille GoTours (solde en lecture seule au Lot 1 — paiement réel en Lot 2)."""
+    """Consulter son portefeuille FasoViva (solde en lecture seule au Lot 1 — paiement réel en Lot 2)."""
     return await finance_service.get_or_create_wallet(current_user.sub)
 
 

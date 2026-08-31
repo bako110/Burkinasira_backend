@@ -14,7 +14,7 @@ from app.schemas.ai_assistant import (
 )
 from app.services import ai_assistant_service
 
-router = APIRouter(prefix="/ai", tags=["IA — GoTours AI"])
+router = APIRouter(prefix="/ai", tags=["IA — FasoViva AI"])
 
 
 @router.post("/messages", response_model=ConversationResponse)
@@ -28,7 +28,7 @@ async def send_message(
 
 @router.get("/conversations", response_model=list)
 async def list_my_conversations(current_user: TokenPayload = Depends(get_current_user)):
-    """Historique de ses conversations avec GoTours AI."""
+    """Historique de ses conversations avec FasoViva AI."""
     return await ai_assistant_service.list_my_conversations(current_user.sub)
 
 

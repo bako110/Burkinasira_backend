@@ -14,7 +14,7 @@ from app.schemas.review import (
 )
 from app.services import review_service
 
-router = APIRouter(prefix="/reviews", tags=["Avis clients — GoTours Verified"])
+router = APIRouter(prefix="/reviews", tags=["Avis clients — FasoViva Verified"])
 
 
 @router.post("", response_model=ReviewResponse, status_code=status.HTTP_201_CREATED)

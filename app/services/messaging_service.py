@@ -19,7 +19,7 @@ from app.services import notification_service
 CONVERSATIONS_COLLECTION = "conversations"
 MESSAGES_COLLECTION = "chat_messages"
 
-SUPPORT_USER_ID = "gotours-support"
+SUPPORT_USER_ID = "fasoviva-support"
 
 
 def _conversation_to_response(doc: dict) -> ConversationResponse:

@@ -101,7 +101,7 @@ async def get_home_feed(user_id: Optional[str], near_lat: Optional[float] = None
     """Accueil intelligent : agrège suggestions, populaires, événements, services proches, mode voyage (§2)."""
     popular = await destination_service.list_destinations(page=1, page_size=8)
 
-    suggested = popular  # personnalisation avancée réservée à GoTours AI (§26) une fois le provider LLM configuré
+    suggested = popular  # personnalisation avancée réservée à FasoViva AI (§26) une fois le provider LLM configuré
     if user_id:
         trips = await trip_service.list_my_trips(user_id)
         region_pref = trips[0].region if trips and trips[0].region else None

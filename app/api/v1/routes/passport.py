@@ -12,7 +12,7 @@ from app.schemas.passport import (
 )
 from app.services import passport_service
 
-router = APIRouter(prefix="/passport", tags=["Passeport GoTours et gamification"])
+router = APIRouter(prefix="/passport", tags=["Passeport FasoViva et gamification"])
 
 
 @router.get("/me", response_model=PassportResponse)

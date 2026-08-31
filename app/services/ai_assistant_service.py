@@ -30,7 +30,7 @@ async def _call_ai_provider(system_prompt: str, user_message: str) -> str:
     """
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail="GoTours AI n'est pas encore configuré (clé API du fournisseur LLM manquante).",
+        detail="FasoViva AI n'est pas encore configuré (clé API du fournisseur LLM manquante).",
     )
 
 
@@ -82,7 +82,7 @@ async def send_message(data: SendMessageRequest, user_id: str) -> ConversationRe
     user_msg = {"role": MessageRole.USER.value, "content": data.message, "created_at": now}
 
     ai_reply_text = await _call_ai_provider(
-        system_prompt=f"GoTours AI — assistant touristique Burkina Faso, type: {data.type.value}",
+        system_prompt=f"FasoViva AI — assistant touristique Burkina Faso, type: {data.type.value}",
         user_message=data.message,
     )
     assistant_msg = {"role": MessageRole.ASSISTANT.value, "content": ai_reply_text, "created_at": datetime.utcnow()}
