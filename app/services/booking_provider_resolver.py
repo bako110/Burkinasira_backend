@@ -1,4 +1,6 @@
+from typing import Optional
 from bson import ObjectId
+from fastapi import HTTPException, status
 from app.core.database import get_database
 
 # Association item_type -> (collection, champ propriétaire)
@@ -65,6 +67,63 @@ async def is_authorized_for_establishment(item_type: str, item_id: str, user_id:
         "is_active": True,
     })
     return member is not None
+
+
+async def resolve_real_price(item_type: str, item_id: str, room_type_name: Optional[str] = None) -> Optional[tuple]:
+    """Retrouve le prix RÉEL (unit_price, currency) d'un item réservable en base,
+    pour empêcher un client de fournir un prix arbitraire à la création d'une
+    réservation. Retourne None si ce type d'item n'a pas de prix source fiable
+    (ex: restaurant sans plat précisé, transport sans devis) — dans ce cas
+    l'appelant doit décider d'une politique de repli explicite.
+    """
+    if not ObjectId.is_valid(item_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article introuvable")
+    db = get_database()
+
+    if item_type == "hotel":
+        hotel = await db["hotels"].find_one({"_id": ObjectId(item_id)}, {"room_types": 1})
+        if not hotel:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hébergement introuvable")
+        room_types = hotel.get("room_types", [])
+        if not room_types:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cet hébergement n'a aucun type de chambre configuré")
+        if room_type_name:
+            room = next((r for r in room_types if r["name"] == room_type_name), None)
+            if not room:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Type de chambre introuvable")
+        else:
+            room = room_types[0]
+        return (room["price_per_night"], room.get("currency", "XOF"))
+
+    if item_type == "event":
+        event = await db["events"].find_one({"_id": ObjectId(item_id)}, {"ticket_price": 1, "currency": 1})
+        if not event:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Événement introuvable")
+        return (event.get("ticket_price") or 0.0, event.get("currency", "XOF"))
+
+    if item_type == "guide":
+        guide = await db["guide_profiles"].find_one({"_id": ObjectId(item_id)}, {"daily_rate": 1, "currency": 1})
+        if not guide:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guide introuvable")
+        if guide.get("daily_rate") is None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ce guide n'a pas de tarif journalier configuré")
+        return (guide["daily_rate"], guide.get("currency", "XOF"))
+
+    return None
+
+
+async def resolve_guide_hourly_rate(guide_id: str) -> Optional[tuple]:
+    """Tarif horaire réel d'un guide, utilisé pour calculer le prix d'une
+    réservation basée sur un créneau (slot_id) plutôt qu'une journée entière."""
+    if not ObjectId.is_valid(guide_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guide introuvable")
+    db = get_database()
+    guide = await db["guide_profiles"].find_one({"_id": ObjectId(guide_id)}, {"hourly_rate": 1, "currency": 1})
+    if not guide:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guide introuvable")
+    if guide.get("hourly_rate") is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ce guide n'a pas de tarif horaire configuré")
+    return (guide["hourly_rate"], guide.get("currency", "XOF"))
 
 
 async def list_managed_establishment_ids(user_id: str, item_type: str) -> list:

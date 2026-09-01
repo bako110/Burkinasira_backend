@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, Field
+from typing import Optional
+from pydantic import BaseModel, Field, field_validator
 from app.models.booking import BookingItemType, BookingStatus
 
 
@@ -8,15 +8,30 @@ class CreateBookingRequest(BaseModel):
     item_type: BookingItemType
     item_id: str
     item_title: str
-    quantity: int = Field(default=1, gt=0)
-    unit_price: float = Field(..., ge=0)
+    quantity: int = Field(default=1, gt=0, le=20)
+    unit_price: float = Field(
+        default=0,
+        ge=0,
+        description="Indicatif seulement : le serveur recalcule le prix réel pour "
+        "les types d'item qui ont une source de prix fiable (hotel, event, guide).",
+    )
     currency: str = "XOF"
     scheduled_date: Optional[datetime] = None
+    room_type_name: Optional[str] = Field(
+        default=None, description="Type de chambre choisi (item_type == \"hotel\")."
+    )
     slot_id: Optional[str] = Field(
         default=None,
         description="Créneau de disponibilité choisi (item_type == \"guide\"). "
         "Verrouille le créneau et déduit scheduled_date automatiquement.",
     )
+
+    @field_validator("scheduled_date")
+    @classmethod
+    def reject_past_date(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v is not None and v < datetime.utcnow():
+            raise ValueError("La date de réservation ne peut pas être dans le passé")
+        return v
 
 
 class BookingResponse(BaseModel):
@@ -27,6 +42,7 @@ class BookingResponse(BaseModel):
     item_type: BookingItemType
     item_id: str
     slot_id: Optional[str] = None
+    room_type_name: Optional[str] = None
     item_title: str
     quantity: int
     unit_price: float
@@ -37,6 +53,17 @@ class BookingResponse(BaseModel):
     ticket_qr_code: str
     cancellation_reason: Optional[str] = None
     created_at: datetime
+
+
+class PublicTicketResponse(BaseModel):
+    """Vue restreinte d'une réservation pour la validation d'un ticket QR
+    (route publique) — n'expose ni customer_id, ni provider_id, ni prix."""
+    booking_reference: str
+    item_type: BookingItemType
+    item_title: str
+    quantity: int
+    scheduled_date: Optional[datetime] = None
+    status: BookingStatus
 
 
 class GuideBookingResponse(BookingResponse):

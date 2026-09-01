@@ -9,6 +9,7 @@ from app.schemas.booking import (
     BookingResponse,
     CancelBookingRequest,
     InvoiceResponse,
+    PublicTicketResponse,
 )
 from app.services import booking_service
 from app.services.booking_provider_resolver import is_authorized_for_establishment
@@ -36,9 +37,9 @@ async def list_my_bookings(
     return await booking_service.list_my_bookings(current_user.sub, status_filter)
 
 
-@router.get("/reference/{reference}", response_model=BookingResponse)
+@router.get("/reference/{reference}", response_model=PublicTicketResponse)
 async def get_booking_by_reference(reference: str):
-    """Présenter/valider le ticket QR Code."""
+    """Présenter/valider le ticket QR Code (public, sans données personnelles)."""
     return await booking_service.get_booking_by_reference(reference)
 
 
