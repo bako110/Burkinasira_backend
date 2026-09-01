@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 COLLECTION = "ai_conversations"
 
 _ASSISTANT_BASE_PROMPT = (
-    "Tu es l'assistant touristique officiel de FasoViva, une application qui aide les visiteurs "
+    "Tu es l'assistant touristique officiel de BurkinaSira, une application qui aide les visiteurs "
     "et habitants à découvrir le Burkina Faso : hébergements, restaurants, transport, guides, "
     "événements, artisanat, culture et informations pratiques (santé, sécurité, météo, argent). "
     "Réponds toujours en français sauf si l'utilisateur écrit dans une autre langue. "
@@ -51,7 +51,7 @@ async def _call_ai_provider(system_prompt: str, history: list, user_message: str
     if not _is_ai_configured():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="L'assistant FasoViva n'est pas encore activé sur ce serveur (clé API manquante).",
+            detail="L'assistant BurkinaSira n'est pas encore activé sur ce serveur (clé API manquante).",
         )
 
     messages = [
@@ -76,7 +76,7 @@ async def _call_ai_provider(system_prompt: str, history: list, user_message: str
         logger.exception("Échec de l'appel à l'assistant IA")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="L'assistant FasoViva est momentanément indisponible, réessayez dans un instant.",
+            detail="L'assistant BurkinaSira est momentanément indisponible, réessayez dans un instant.",
         )
 
 
