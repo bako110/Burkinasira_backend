@@ -35,6 +35,8 @@ class ConversationResponse(BaseModel):
     last_message_preview: Optional[str] = None
     last_message_at: Optional[datetime] = None
     created_at: datetime
+    display_name: Optional[str] = None
+    display_avatar_url: Optional[str] = None
 
 
 class ContactSupportRequest(BaseModel):
