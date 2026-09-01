@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     # Stockage des médias (images/vidéos) sur le disque du serveur
     UPLOAD_DIR: str = "uploads"
     PUBLIC_BASE_URL: str = "http://localhost:8000"
+
+    # Assistant IA — optionnel : tant qu'aucune clé n'est fournie, l'assistant
+    # répond avec un message clair indiquant qu'il n'est pas encore activé.
+    ANTHROPIC_API_KEY: Optional[str] = None
+    ANTHROPIC_MODEL: str = "claude-haiku-4-5-20251001"
     
     @property
     def cors_origins(self) -> list:
