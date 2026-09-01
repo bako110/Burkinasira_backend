@@ -6,6 +6,7 @@ from app.schemas.auth import (
     UpdateProfileRequest,
     ChangePasswordRequest,
     UserPublic,
+    UserVerification,
     TokenResponse,
     TokenPayload,
 )
@@ -39,6 +40,12 @@ async def update_me(
 ):
     """Mettre à jour son profil."""
     return await user_service.update_profile(current_user.sub, data)
+
+
+@router.get("/verify/{user_id}", response_model=UserVerification)
+async def verify_card(user_id: str):
+    """Vérification publique d'une carte FasoViva à partir du QR code (sans authentification)."""
+    return await user_service.verify_user_card(user_id)
 
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)

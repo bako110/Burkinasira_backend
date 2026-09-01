@@ -61,6 +61,17 @@ class UserPublic(BaseModel):
     created_at: datetime
 
 
+class UserVerification(BaseModel):
+    """Informations minimales exposées publiquement pour vérifier l'identité
+    d'un porteur de carte FasoViva (via le QR code) — pas d'email ni téléphone."""
+    id: str
+    full_name: str
+    role: UserRole
+    is_verified: bool
+    avatar_url: Optional[str] = None
+    member_since: datetime
+
+
 class TokenPayload(BaseModel):
     sub: str
     email: EmailStr

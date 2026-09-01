@@ -10,6 +10,7 @@ from app.schemas.auth import (
     LoginRequest,
     UpdateProfileRequest,
     UserPublic,
+    UserVerification,
     TokenResponse,
 )
 
@@ -125,6 +126,25 @@ async def get_user_by_id(user_id: str) -> UserPublic:
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur introuvable")
     return _to_public(doc)
+
+
+async def verify_user_card(user_id: str) -> UserVerification:
+    """Vérification publique d'une carte FasoViva à partir de son QR code.
+    N'expose aucune donnée sensible (pas d'email, pas de téléphone)."""
+    db = get_database()
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Carte introuvable")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(user_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Carte introuvable")
+    return UserVerification(
+        id=str(doc["_id"]),
+        full_name=doc["full_name"],
+        role=doc["role"],
+        is_verified=doc.get("is_verified", False),
+        avatar_url=doc.get("avatar_url"),
+        member_since=doc["created_at"],
+    )
 
 
 async def update_profile(user_id: str, data: UpdateProfileRequest) -> UserPublic:
