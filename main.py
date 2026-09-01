@@ -32,13 +32,32 @@ app = FastAPI(
 )
 
 # Configuration CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
+# Origines des applications natives (Capacitor) : la WebView Android utilise
+# https://localhost, iOS utilise capacitor://localhost.
+_native_origins = ["https://localhost", "capacitor://localhost", "http://localhost"]
+_cors_origins = settings.cors_origins
+
+_cors_kwargs = dict(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+if _cors_origins == ["*"]:
+    # allow_credentials=True est incompatible avec allow_origins=["*"] :
+    # Starlette n'émet alors aucun header CORS. On autorise tout via regex.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=".*",
+        **_cors_kwargs,
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list({*_cors_origins, *_native_origins}),
+        **_cors_kwargs,
+    )
 
 # Fichiers médias téléversés (images/vidéos), servis directement par le serveur
 Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
