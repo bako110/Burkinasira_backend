@@ -141,7 +141,7 @@ async def get_user_by_id(user_id: str) -> UserPublic:
 
 async def get_or_create_card_token(user_id: str) -> str:
     """Retourne le token opaque et non-devinable utilisé dans le QR code de la
-    carte FasoViva de cet utilisateur, en le générant s'il n'existe pas encore.
+    carte BurkinaSira de cet utilisateur, en le générant s'il n'existe pas encore.
     Ce token ne doit jamais permettre de retrouver ou d'énumérer l'ObjectId réel."""
     db = get_database()
     await _ensure_card_token_index(db)
@@ -159,7 +159,7 @@ async def get_or_create_card_token(user_id: str) -> str:
 
 
 async def verify_user_card(card_token: str) -> UserVerification:
-    """Vérification publique d'une carte FasoViva à partir de son QR code.
+    """Vérification publique d'une carte BurkinaSira à partir de son QR code.
     N'expose aucune donnée sensible (pas d'email, pas de téléphone, pas d'ObjectId)."""
     db = get_database()
     doc = await db[COLLECTION].find_one({"card_token": card_token})

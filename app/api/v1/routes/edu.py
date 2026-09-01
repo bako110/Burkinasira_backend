@@ -15,7 +15,7 @@ from app.schemas.edu import (
 )
 from app.services import edu_service
 
-router = APIRouter(prefix="/edu", tags=["Tourisme éducatif — FasoViva Edu"])
+router = APIRouter(prefix="/edu", tags=["Tourisme éducatif — BurkinaSira Edu"])
 
 
 @router.get("/outings")

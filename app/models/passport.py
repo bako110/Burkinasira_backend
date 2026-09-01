@@ -62,7 +62,7 @@ class UserChallengeProgress(BaseModel):
 
 
 class TravelPassport(BaseModel):
-    """Passeport numérique FasoViva de l'utilisateur (§28)."""
+    """Passeport numérique BurkinaSira de l'utilisateur (§28)."""
     id: Optional[str] = Field(default=None, alias="_id")
     user_id: str
     stamps: List[Stamp] = []

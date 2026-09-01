@@ -114,7 +114,7 @@ app.include_router(guide_availability.router, prefix=settings.API_V1_PREFIX + "/
 app.include_router(hotels.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES RESTAURATION — FASOVIVA FOOD (§8)
+# ROUTES RESTAURATION — BURKINASIRA FOOD (§8)
 # ============================================
 app.include_router(cuisines.router, prefix=settings.API_V1_PREFIX)
 
@@ -170,7 +170,7 @@ app.include_router(events.router, prefix=settings.API_V1_PREFIX)
 app.include_router(stories.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES ARTISANAT ET MARKETPLACE — FASOVIVA MARKET (§19)
+# ROUTES ARTISANAT ET MARKETPLACE — BURKINASIRA MARKET (§19)
 # ============================================
 app.include_router(artisans.router, prefix=settings.API_V1_PREFIX)
 
@@ -205,7 +205,7 @@ app.include_router(weather.router, prefix=settings.API_V1_PREFIX)
 app.include_router(trips.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES IA — FASOVIVA AI (§26)
+# ROUTES IA — BURKINASIRA AI (§26)
 # ============================================
 app.include_router(ai_assistant.router, prefix=settings.API_V1_PREFIX)
 
@@ -215,17 +215,17 @@ app.include_router(ai_assistant.router, prefix=settings.API_V1_PREFIX)
 app.include_router(community.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES PASSEPORT FASOVIVA ET GAMIFICATION (§28)
+# ROUTES PASSEPORT BURKINASIRA ET GAMIFICATION (§28)
 # ============================================
 app.include_router(passport.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES TOURISME D'AFFAIRES — FASOVIVA BUSINESS (§29)
+# ROUTES TOURISME D'AFFAIRES — BURKINASIRA BUSINESS (§29)
 # ============================================
 app.include_router(business.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES TOURISME ÉDUCATIF — FASOVIVA EDU (§30)
+# ROUTES TOURISME ÉDUCATIF — BURKINASIRA EDU (§30)
 # ============================================
 app.include_router(edu.router, prefix=settings.API_V1_PREFIX)
 
@@ -260,7 +260,7 @@ app.include_router(pro_workspace.router, prefix=settings.API_V1_PREFIX)
 app.include_router(operators.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES FASOVIVA VERIFIED — CONFIANCE (§37)
+# ROUTES BURKINASIRA VERIFIED — CONFIANCE (§37)
 # ============================================
 app.include_router(verified.router, prefix=settings.API_V1_PREFIX)
 
@@ -290,7 +290,7 @@ app.include_router(notifications.router, prefix=settings.API_V1_PREFIX)
 app.include_router(offline.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES ADMINISTRATION FASOVIVA (§43)
+# ROUTES ADMINISTRATION BURKINASIRA (§43)
 # ============================================
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 
@@ -325,7 +325,7 @@ app.include_router(home.router, prefix=settings.API_V1_PREFIX)
 app.include_router(media.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
-# ROUTES AVIS CLIENTS (§37 FasoViva Verified)
+# ROUTES AVIS CLIENTS (§37 BurkinaSira Verified)
 # ============================================
 app.include_router(reviews.router, prefix=settings.API_V1_PREFIX)
 
@@ -334,7 +334,7 @@ app.include_router(reviews.router, prefix=settings.API_V1_PREFIX)
 # ============================================
 app.include_router(ws.router)
 
-# Les 47 domaines fonctionnels du cahier FasoViva (§2 à §47) sont désormais
+# Les 47 domaines fonctionnels du cahier BurkinaSira (§2 à §47) sont désormais
 # tous reconstruits et câblés.
 
 

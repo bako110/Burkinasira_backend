@@ -39,7 +39,7 @@ async def _resolve_display_name(doc: dict, current_user_id: str) -> tuple:
     other_id = next((p for p in doc.get("participant_ids", []) if p != current_user_id), None)
 
     if other_id == SUPPORT_USER_ID:
-        return ("FasoViva Support", None)
+        return ("BurkinaSira Support", None)
 
     if kind in _ESTABLISHMENT_KINDS and doc.get("linked_booking_id"):
         booking = await db[BOOKINGS_COLLECTION].find_one(

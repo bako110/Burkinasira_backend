@@ -173,7 +173,7 @@ async def update_guide_profile_by_id(guide_id: str, data: UpdateGuideProfileRequ
 
 
 async def set_verification_status(guide_id: str, is_verified: bool) -> GuideDetail:
-    """(Admin) Vérifier ou retirer la vérification d'un guide (§37 FasoViva Verified)."""
+    """(Admin) Vérifier ou retirer la vérification d'un guide (§37 BurkinaSira Verified)."""
     db = get_database()
     if not ObjectId.is_valid(guide_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guide introuvable")

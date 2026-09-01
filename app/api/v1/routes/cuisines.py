@@ -12,7 +12,7 @@ from app.schemas.cuisine import (
 )
 from app.services import cuisine_service
 
-router = APIRouter(prefix="/restaurants", tags=["Restauration — FasoViva Food"])
+router = APIRouter(prefix="/restaurants", tags=["Restauration — BurkinaSira Food"])
 
 
 @router.get("", response_model=RestaurantListResponse)

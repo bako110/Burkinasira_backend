@@ -15,7 +15,7 @@ from app.schemas.mobility import (
 )
 from app.services import mobility_service
 
-router = APIRouter(prefix="/mobility", tags=["Transport et mobilité — FasoViva Mobility"])
+router = APIRouter(prefix="/mobility", tags=["Transport et mobilité — BurkinaSira Mobility"])
 
 
 @router.get("/providers", response_model=TransportProviderListResponse)

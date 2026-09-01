@@ -2,7 +2,7 @@
 
 Ce script :
   1. supprime tous les comptes ayant le rôle "admin" dans la base ;
-  2. crée un unique compte admin `admin@fasoviva.com`.
+  2. crée un unique compte admin `admin@burkinasira.com`.
 
 Le mot de passe n'est jamais écrit en dur : il est lu depuis l'argument
 `--password` ou la variable d'environnement `ADMIN_PASSWORD`.
@@ -16,7 +16,7 @@ ou
     ADMIN_PASSWORD="MotDePasseFort!" python -m scripts.manage_admin
 
 Options :
-    --email        Adresse de l'admin à créer (défaut: admin@fasoviva.com)
+    --email        Adresse de l'admin à créer (défaut: admin@burkinasira.com)
     --name         Nom affiché (défaut: Administrateur FasoViva)
     --keep-others  Ne supprime pas les autres admins, met seulement à jour / crée celui-ci
     --dry-run      Affiche ce qui serait fait, sans rien modifier
@@ -36,8 +36,8 @@ from app.core.security import hash_password  # noqa: E402
 from app.models.user import UserRole, UserStatus  # noqa: E402
 
 COLLECTION = "users"
-DEFAULT_EMAIL = "admin@fasoviva.com"
-DEFAULT_NAME = "Administrateur FasoViva"
+DEFAULT_EMAIL = "admin@burkinasira.com"
+DEFAULT_NAME = "Administrateur BurkinaSira"
 
 
 async def run(email: str, name: str, password: str, keep_others: bool, dry_run: bool) -> None:

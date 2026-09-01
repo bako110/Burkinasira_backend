@@ -17,7 +17,7 @@ from app.schemas.artisan import (
 )
 from app.services import artisan_service
 
-router = APIRouter(prefix="/market", tags=["Artisanat et marketplace — FasoViva Market"])
+router = APIRouter(prefix="/market", tags=["Artisanat et marketplace — BurkinaSira Market"])
 
 
 @router.get("/artisans", response_model=list)
@@ -137,7 +137,7 @@ async def create_product(
     data: CreateProductRequest,
     current_user: TokenPayload = Depends(require_verified_provider),
 ):
-    """(Vendeur) Ajouter un produit à son catalogue. (Admin) Ajouter un produit pour un artisan donné, ou pour la vitrine FasoViva si aucun n'est précisé."""
+    """(Vendeur) Ajouter un produit à son catalogue. (Admin) Ajouter un produit pour un artisan donné, ou pour la vitrine BurkinaSira si aucun n'est précisé."""
     if current_user.role == UserRole.ADMIN:
         if data.artisan_id:
             artisan_id = data.artisan_id

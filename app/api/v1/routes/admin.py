@@ -13,7 +13,7 @@ from app.schemas.admin import (
 )
 from app.services import admin_service
 
-router = APIRouter(prefix="/admin", tags=["Administration FasoViva"])
+router = APIRouter(prefix="/admin", tags=["Administration BurkinaSira"])
 
 
 @router.get("/dashboard", response_model=NationalDashboardResponse)

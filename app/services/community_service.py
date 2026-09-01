@@ -379,7 +379,7 @@ async def get_group_detail(group_id: str) -> GroupDetailResponse:
     members = [
         GroupMemberPublic(
             id=uid,
-            full_name=users_by_id[uid]["full_name"] if uid in users_by_id else "Utilisateur FasoViva",
+            full_name=users_by_id[uid]["full_name"] if uid in users_by_id else "Utilisateur BurkinaSira",
             avatar_url=users_by_id[uid].get("avatar_url") if uid in users_by_id else None,
         )
         for uid in member_ids

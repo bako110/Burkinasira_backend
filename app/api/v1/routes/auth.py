@@ -44,13 +44,13 @@ async def update_me(
 
 @router.get("/card-token")
 async def get_card_token(current_user: TokenPayload = Depends(get_current_user)):
-    """Token opaque à encoder dans le QR code de sa propre carte FasoViva."""
+    """Token opaque à encoder dans le QR code de sa propre carte BurkinaSira."""
     return {"card_token": await user_service.get_or_create_card_token(current_user.sub)}
 
 
 @router.get("/verify/{card_token}", response_model=UserVerification)
 async def verify_card(card_token: str):
-    """Vérification publique d'une carte FasoViva à partir du QR code (sans authentification)."""
+    """Vérification publique d'une carte BurkinaSira à partir du QR code (sans authentification)."""
     return await user_service.verify_user_card(card_token)
 
 

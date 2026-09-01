@@ -146,13 +146,13 @@ async def delete_artisan(user_id: str, is_admin: bool = False, target_artisan_id
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profil artisan introuvable")
 
 
-OFFICIAL_ARTISAN_NAME = "FasoViva"
+OFFICIAL_ARTISAN_NAME = "BurkinaSira"
 _LEGACY_OFFICIAL_ARTISAN_NAME = "GoTours"
 
 
 async def get_or_create_official_artisan(admin_user_id: str) -> ArtisanResponse:
     """Profil artisan officiel utilisé pour les produits ajoutés directement par l'admin,
-    sans artisan associé (vitrine FasoViva)."""
+    sans artisan associé (vitrine BurkinaSira)."""
     db = get_database()
     doc = await db[ARTISANS_COLLECTION].find_one(
         {"display_name": {"$in": [OFFICIAL_ARTISAN_NAME, _LEGACY_OFFICIAL_ARTISAN_NAME]}, "user_id": admin_user_id}
@@ -169,7 +169,7 @@ async def get_or_create_official_artisan(admin_user_id: str) -> ArtisanResponse:
     doc = {
         "user_id": admin_user_id,
         "display_name": OFFICIAL_ARTISAN_NAME,
-        "story": "Produits proposés directement par la plateforme FasoViva.",
+        "story": "Produits proposés directement par la plateforme BurkinaSira.",
         "photo_url": None,
         "region": "Centre",
         "city": None,
