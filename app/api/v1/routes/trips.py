@@ -32,7 +32,8 @@ async def list_my_trips(current_user: TokenPayload = Depends(get_current_user)):
 @router.get("/{trip_id}", response_model=TripDetail)
 async def get_trip(trip_id: str, current_user: TokenPayload = Depends(get_current_user)):
     """Détail d'un voyage : calendrier jour par jour, budget prévisionnel."""
-    return await trip_service.get_trip(trip_id, current_user.sub)
+    real_id = await trip_service.resolve_trip_id(trip_id)
+    return await trip_service.get_trip(real_id, current_user.sub)
 
 
 @router.patch("/{trip_id}", response_model=TripDetail)
@@ -42,13 +43,15 @@ async def update_trip(
     current_user: TokenPayload = Depends(get_current_user),
 ):
     """Mettre à jour un voyage."""
-    return await trip_service.update_trip(trip_id, data, current_user.sub)
+    real_id = await trip_service.resolve_trip_id(trip_id)
+    return await trip_service.update_trip(real_id, data, current_user.sub)
 
 
 @router.delete("/{trip_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_trip(trip_id: str, current_user: TokenPayload = Depends(get_current_user)):
     """Supprimer un voyage (créateur uniquement)."""
-    await trip_service.delete_trip(trip_id, current_user.sub)
+    real_id = await trip_service.resolve_trip_id(trip_id)
+    await trip_service.delete_trip(real_id, current_user.sub)
 
 
 @router.post("/{trip_id}/days/items", response_model=TripDetail)
@@ -58,7 +61,8 @@ async def add_day_item(
     current_user: TokenPayload = Depends(get_current_user),
 ):
     """Ajouter un élément au calendrier jour par jour."""
-    return await trip_service.add_day_item(trip_id, data, current_user.sub)
+    real_id = await trip_service.resolve_trip_id(trip_id)
+    return await trip_service.add_day_item(real_id, data, current_user.sub)
 
 
 @router.delete("/{trip_id}/days/items", response_model=TripDetail)
@@ -68,7 +72,8 @@ async def remove_day_item(
     current_user: TokenPayload = Depends(get_current_user),
 ):
     """Retirer un élément du calendrier jour par jour."""
-    return await trip_service.remove_day_item(trip_id, data, current_user.sub)
+    real_id = await trip_service.resolve_trip_id(trip_id)
+    return await trip_service.remove_day_item(real_id, data, current_user.sub)
 
 
 @router.post("/{trip_id}/bookings/{booking_id}", response_model=TripDetail)
@@ -78,7 +83,8 @@ async def link_booking(
     current_user: TokenPayload = Depends(get_current_user),
 ):
     """Lier une réservation existante au voyage."""
-    return await trip_service.link_booking(trip_id, booking_id, current_user.sub)
+    real_id = await trip_service.resolve_trip_id(trip_id)
+    return await trip_service.link_booking(real_id, booking_id, current_user.sub)
 
 
 @router.post("/{trip_id}/share", response_model=TripDetail)
@@ -88,4 +94,5 @@ async def share_trip(
     current_user: TokenPayload = Depends(get_current_user),
 ):
     """Partager le voyage avec un accompagnateur (§25)."""
-    return await trip_service.share_trip(trip_id, data, current_user.sub)
+    real_id = await trip_service.resolve_trip_id(trip_id)
+    return await trip_service.share_trip(real_id, data, current_user.sub)

@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime, date
 from typing import Optional
 from bson import ObjectId
@@ -16,10 +17,34 @@ from app.schemas.trip import (
 
 COLLECTION = "trips"
 
+_token_index_ensured = False
+
+
+async def _ensure_token_index(db) -> None:
+    global _token_index_ensured
+    if _token_index_ensured:
+        return
+    await db[COLLECTION].create_index("share_token", unique=True, sparse=True)
+    _token_index_ensured = True
+
+
+async def resolve_trip_id(trip_id_or_token: str) -> str:
+    """Accepte soit l'ObjectId réel d'un voyage, soit son token de navigation
+    opaque (share_token), et retourne toujours l'ObjectId réel en string.
+    Le frontend n'utilise que le token dans ses URLs pour ne pas exposer
+    l'identifiant technique du voyage (privé, propre à chaque utilisateur)."""
+    if ObjectId.is_valid(trip_id_or_token):
+        return trip_id_or_token
+    db = get_database()
+    doc = await db[COLLECTION].find_one({"share_token": trip_id_or_token}, {"_id": 1})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Voyage introuvable")
+    return str(doc["_id"])
+
 
 def _to_summary(doc: dict) -> TripSummary:
     return TripSummary(
-        id=str(doc["_id"]),
+        id=doc.get("share_token") or str(doc["_id"]),
         title=doc["title"],
         themes=doc.get("themes", []),
         region=doc.get("region"),
@@ -33,7 +58,7 @@ def _to_summary(doc: dict) -> TripSummary:
 
 def _to_detail(doc: dict) -> TripDetail:
     return TripDetail(
-        id=str(doc["_id"]),
+        id=doc.get("share_token") or str(doc["_id"]),
         owner_id=doc["owner_id"],
         title=doc["title"],
         themes=doc.get("themes", []),
@@ -62,6 +87,7 @@ def _check_access(doc: dict, user_id: str, require_edit: bool = False) -> None:
 
 async def create_trip(data: CreateTripRequest, owner_id: str) -> TripDetail:
     db = get_database()
+    await _ensure_token_index(db)
     now = datetime.utcnow()
     doc = data.model_dump()
     doc["owner_id"] = owner_id
@@ -69,6 +95,7 @@ async def create_trip(data: CreateTripRequest, owner_id: str) -> TripDetail:
     doc["linked_booking_ids"] = []
     doc["collaborators"] = []
     doc["status"] = TripStatus.DRAFT.value
+    doc["share_token"] = secrets.token_urlsafe(12)
     doc["created_at"] = now
     doc["updated_at"] = now
     result = await db[COLLECTION].insert_one(doc)
