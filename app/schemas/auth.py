@@ -1,7 +1,16 @@
+import re
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.models.user import UserRole
+
+
+def _validate_password_strength(v: str) -> str:
+    if not re.search(r"[A-Z]", v):
+        raise ValueError("Le mot de passe doit contenir au moins une majuscule")
+    if not re.search(r"[0-9]", v):
+        raise ValueError("Le mot de passe doit contenir au moins un chiffre")
+    return v
 
 
 class RegisterRequest(BaseModel):
@@ -10,6 +19,11 @@ class RegisterRequest(BaseModel):
     phone: Optional[str] = None
     password: str = Field(..., min_length=8)
     role: UserRole = UserRole.TOURIST
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return _validate_password_strength(v)
 
     @field_validator("role")
     @classmethod
@@ -36,10 +50,20 @@ class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str = Field(..., min_length=8)
 
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return _validate_password_strength(v)
+
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str = Field(..., min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return _validate_password_strength(v)
 
 
 class UpdateProfileRequest(BaseModel):
