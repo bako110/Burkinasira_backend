@@ -53,6 +53,7 @@ class UpdateRestaurantRequest(BaseModel):
 class RestaurantSummary(BaseModel):
     id: str
     name: str
+    slug: str
     type: EstablishmentType
     cuisine_style: Optional[str] = None
     region: str
@@ -68,6 +69,7 @@ class RestaurantDetail(BaseModel):
     id: str
     owner_id: str
     name: str
+    slug: str
     type: EstablishmentType
     description: str
     cuisine_style: Optional[str] = None

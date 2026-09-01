@@ -3,6 +3,7 @@ from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, status
 from app.core.database import get_database
+from app.utils.slug import generate_unique_slug, find_by_slug_or_id, ensure_slug_index
 from app.models.artisan import ProductCategory, ArtisanStatus, ProductStatus
 from app.schemas.artisan import (
     CreateArtisanRequest,
@@ -204,6 +205,7 @@ def _product_to_summary(doc: dict) -> ProductSummary:
         id=str(doc["_id"]),
         artisan_id=doc["artisan_id"],
         name=doc["name"],
+        slug=doc["slug"],
         category=doc["category"],
         price=doc["price"],
         currency=doc.get("currency", "XOF"),
@@ -220,6 +222,7 @@ def _product_to_detail(doc: dict) -> ProductDetail:
         id=str(doc["_id"]),
         artisan_id=doc["artisan_id"],
         name=doc["name"],
+        slug=doc["slug"],
         description=doc["description"],
         category=doc["category"],
         price=doc["price"],
@@ -238,9 +241,11 @@ def _product_to_detail(doc: dict) -> ProductDetail:
 
 async def create_product(data: CreateProductRequest, artisan_id: str) -> ProductDetail:
     db = get_database()
+    await ensure_slug_index(db, PRODUCTS_COLLECTION)
     now = datetime.utcnow()
     doc = data.model_dump()
     doc["artisan_id"] = artisan_id
+    doc["slug"] = await generate_unique_slug(db, PRODUCTS_COLLECTION, data.name)
     doc["average_rating"] = 0.0
     doc["review_count"] = 0
     doc["status"] = ProductStatus.PUBLISHED.value
@@ -290,9 +295,7 @@ async def list_my_products(artisan_id: str) -> list:
 
 async def get_product(product_id: str) -> ProductDetail:
     db = get_database()
-    if not ObjectId.is_valid(product_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produit introuvable")
-    doc = await db[PRODUCTS_COLLECTION].find_one({"_id": ObjectId(product_id)})
+    doc = await find_by_slug_or_id(db, PRODUCTS_COLLECTION, product_id)
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produit introuvable")
     return _product_to_detail(doc)

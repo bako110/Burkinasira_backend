@@ -74,6 +74,7 @@ class ProductSummary(BaseModel):
     id: str
     artisan_id: str
     name: str
+    slug: str
     category: ProductCategory
     price: float
     currency: str
@@ -88,6 +89,7 @@ class ProductDetail(BaseModel):
     id: str
     artisan_id: str
     name: str
+    slug: str
     description: str
     category: ProductCategory
     price: float

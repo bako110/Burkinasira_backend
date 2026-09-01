@@ -35,6 +35,7 @@ class UpdateCultureContentRequest(BaseModel):
 class CultureContentSummary(BaseModel):
     id: str
     title: str
+    slug: str
     type: CultureContentType
     media_type: CultureMediaType
     summary: Optional[str] = None
@@ -46,6 +47,7 @@ class CultureContentSummary(BaseModel):
 class CultureContentDetail(BaseModel):
     id: str
     title: str
+    slug: str
     type: CultureContentType
     media_type: CultureMediaType
     summary: Optional[str] = None

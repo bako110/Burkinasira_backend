@@ -35,6 +35,7 @@ class UpdateGuideProfileRequest(BaseModel):
 class GuideSummary(BaseModel):
     id: str
     display_name: str
+    slug: str
     photo_url: Optional[str] = None
     languages: List[str]
     specialties: List[str]
@@ -51,6 +52,7 @@ class GuideDetail(BaseModel):
     id: str
     user_id: str
     display_name: str
+    slug: str
     bio: Optional[str] = None
     photo_url: Optional[str] = None
     languages: List[str]

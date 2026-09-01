@@ -3,6 +3,7 @@ from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, status
 from app.core.database import get_database
+from app.utils.slug import generate_unique_slug, find_by_slug_or_id, ensure_slug_index
 from app.models.mobility import TransportType, TransportProviderStatus, TripRequestStatus
 from app.schemas.mobility import (
     CreateTransportProviderRequest,
@@ -22,6 +23,7 @@ def _provider_to_summary(doc: dict) -> TransportProviderSummary:
     return TransportProviderSummary(
         id=str(doc["_id"]),
         name=doc["name"],
+        slug=doc["slug"],
         type=doc["type"],
         region=doc["region"],
         province=doc.get("province"),
@@ -40,6 +42,7 @@ def _provider_to_detail(doc: dict) -> TransportProviderDetail:
         id=str(doc["_id"]),
         owner_id=doc["owner_id"],
         name=doc["name"],
+        slug=doc["slug"],
         type=doc["type"],
         description=doc.get("description"),
         region=doc["region"],
@@ -63,9 +66,11 @@ def _provider_to_detail(doc: dict) -> TransportProviderDetail:
 
 async def create_provider(data: CreateTransportProviderRequest, owner_id: str) -> TransportProviderDetail:
     db = get_database()
+    await ensure_slug_index(db, PROVIDERS_COLLECTION)
     now = datetime.utcnow()
     doc = data.model_dump()
     doc["owner_id"] = owner_id
+    doc["slug"] = await generate_unique_slug(db, PROVIDERS_COLLECTION, data.name)
     doc["is_verified"] = False
     doc["status"] = TransportProviderStatus.PENDING.value
     doc["average_rating"] = 0.0
@@ -120,9 +125,7 @@ async def list_my_providers(owner_id: str) -> list:
 
 async def get_provider(provider_id: str) -> TransportProviderDetail:
     db = get_database()
-    if not ObjectId.is_valid(provider_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prestataire de transport introuvable")
-    doc = await db[PROVIDERS_COLLECTION].find_one({"_id": ObjectId(provider_id)})
+    doc = await find_by_slug_or_id(db, PROVIDERS_COLLECTION, provider_id)
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prestataire de transport introuvable")
     return _provider_to_detail(doc)

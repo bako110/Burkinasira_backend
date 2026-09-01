@@ -44,6 +44,7 @@ class UpdateHotelRequest(BaseModel):
 class HotelSummary(BaseModel):
     id: str
     name: str
+    slug: str
     type: AccommodationType
     region: str
     province: Optional[str] = None
@@ -60,6 +61,7 @@ class HotelDetail(BaseModel):
     id: str
     owner_id: str
     name: str
+    slug: str
     type: AccommodationType
     description: str
     region: str

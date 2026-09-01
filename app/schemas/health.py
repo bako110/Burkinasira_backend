@@ -39,6 +39,7 @@ class UpdateHealthFacilityRequest(BaseModel):
 class HealthFacilitySummary(BaseModel):
     id: str
     name: str
+    slug: str
     type: HealthFacilityType
     region: str
     province: Optional[str] = None
@@ -51,6 +52,7 @@ class HealthFacilitySummary(BaseModel):
 class HealthFacilityDetail(BaseModel):
     id: str
     name: str
+    slug: str
     type: HealthFacilityType
     description: Optional[str] = None
     region: str

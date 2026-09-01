@@ -37,6 +37,7 @@ class UpdateConnectivityPointRequest(BaseModel):
 class ConnectivityPointSummary(BaseModel):
     id: str
     name: str
+    slug: str
     type: ConnectivityPointType
     operator: Optional[str] = None
     region: str
@@ -50,6 +51,7 @@ class ConnectivityPointSummary(BaseModel):
 class ConnectivityPointDetail(BaseModel):
     id: str
     name: str
+    slug: str
     type: ConnectivityPointType
     operator: Optional[str] = None
     region: str

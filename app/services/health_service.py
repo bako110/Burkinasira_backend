@@ -4,6 +4,7 @@ from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, status
 from app.core.database import get_database
+from app.utils.slug import generate_unique_slug, find_by_slug_or_id, ensure_slug_index
 from app.models.health import HealthFacilityType, HealthFacilityStatus
 from app.schemas.health import (
     CreateHealthFacilityRequest,
@@ -29,6 +30,7 @@ def _to_summary(doc: dict) -> HealthFacilitySummary:
     return HealthFacilitySummary(
         id=str(doc["_id"]),
         name=doc["name"],
+        slug=doc["slug"],
         type=doc["type"],
         region=doc["region"],
         province=doc.get("province"),
@@ -43,6 +45,7 @@ def _to_detail(doc: dict) -> HealthFacilityDetail:
     return HealthFacilityDetail(
         id=str(doc["_id"]),
         name=doc["name"],
+        slug=doc["slug"],
         type=doc["type"],
         description=doc.get("description"),
         region=doc["region"],
@@ -62,8 +65,10 @@ def _to_detail(doc: dict) -> HealthFacilityDetail:
 
 async def create_health_facility(data: CreateHealthFacilityRequest, created_by: str) -> HealthFacilityDetail:
     db = get_database()
+    await ensure_slug_index(db, COLLECTION)
     now = datetime.utcnow()
     doc = data.model_dump()
+    doc["slug"] = await generate_unique_slug(db, COLLECTION, data.name)
     doc["status"] = HealthFacilityStatus.PUBLISHED.value
     doc["data_source"] = {"verified": False, "source": None, "last_updated_at": now}
     doc["created_at"] = now
@@ -119,9 +124,7 @@ async def list_health_facilities(
 
 async def get_health_facility(facility_id: str) -> HealthFacilityDetail:
     db = get_database()
-    if not ObjectId.is_valid(facility_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Établissement de santé introuvable")
-    doc = await db[COLLECTION].find_one({"_id": ObjectId(facility_id)})
+    doc = await find_by_slug_or_id(db, COLLECTION, facility_id)
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Établissement de santé introuvable")
     return _to_detail(doc)

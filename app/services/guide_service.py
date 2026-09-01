@@ -3,6 +3,7 @@ from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, status
 from app.core.database import get_database
+from app.utils.slug import generate_unique_slug, find_by_slug_or_id, ensure_slug_index
 from app.models.guide import GuideStatus
 from app.schemas.guide import (
     CreateGuideProfileRequest,
@@ -19,6 +20,7 @@ def _to_summary(doc: dict) -> GuideSummary:
     return GuideSummary(
         id=str(doc["_id"]),
         display_name=doc["display_name"],
+        slug=doc["slug"],
         photo_url=doc.get("photo_url"),
         languages=doc.get("languages", []),
         specialties=doc.get("specialties", []),
@@ -37,6 +39,7 @@ def _to_detail(doc: dict) -> GuideDetail:
         id=str(doc["_id"]),
         user_id=doc["user_id"],
         display_name=doc["display_name"],
+        slug=doc["slug"],
         bio=doc.get("bio"),
         photo_url=doc.get("photo_url"),
         languages=doc.get("languages", []),
@@ -60,6 +63,7 @@ def _to_detail(doc: dict) -> GuideDetail:
 
 async def create_guide_profile(data: CreateGuideProfileRequest, user_id: str) -> GuideDetail:
     db = get_database()
+    await ensure_slug_index(db, COLLECTION)
     existing = await db[COLLECTION].find_one({"user_id": user_id})
     if existing:
         raise HTTPException(
@@ -70,6 +74,7 @@ async def create_guide_profile(data: CreateGuideProfileRequest, user_id: str) ->
     now = datetime.utcnow()
     doc = data.model_dump()
     doc["user_id"] = user_id
+    doc["slug"] = await generate_unique_slug(db, COLLECTION, data.display_name)
     doc["is_verified"] = False
     doc["status"] = GuideStatus.PENDING.value
     doc["average_rating"] = 0.0
@@ -122,9 +127,7 @@ async def list_guides(
 
 async def get_guide(guide_id: str) -> GuideDetail:
     db = get_database()
-    if not ObjectId.is_valid(guide_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guide introuvable")
-    doc = await db[COLLECTION].find_one({"_id": ObjectId(guide_id)})
+    doc = await find_by_slug_or_id(db, COLLECTION, guide_id)
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guide introuvable")
     return _to_detail(doc)

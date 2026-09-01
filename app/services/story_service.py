@@ -3,6 +3,7 @@ from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, status
 from app.core.database import get_database
+from app.utils.slug import generate_unique_slug, find_by_slug_or_id, ensure_slug_index
 from app.models.story import CultureContentType
 from app.schemas.story import (
     CreateCultureContentRequest,
@@ -23,6 +24,7 @@ def _content_to_summary(doc: dict) -> CultureContentSummary:
     return CultureContentSummary(
         id=str(doc["_id"]),
         title=doc["title"],
+        slug=doc["slug"],
         type=doc["type"],
         media_type=doc.get("media_type", "texte"),
         summary=doc.get("summary"),
@@ -36,6 +38,7 @@ def _content_to_detail(doc: dict) -> CultureContentDetail:
     return CultureContentDetail(
         id=str(doc["_id"]),
         title=doc["title"],
+        slug=doc["slug"],
         type=doc["type"],
         media_type=doc.get("media_type", "texte"),
         summary=doc.get("summary"),
@@ -53,9 +56,11 @@ def _content_to_detail(doc: dict) -> CultureContentDetail:
 
 async def create_content(data: CreateCultureContentRequest, created_by: str) -> CultureContentDetail:
     db = get_database()
+    await ensure_slug_index(db, CONTENT_COLLECTION)
     now = datetime.utcnow()
     doc = data.model_dump()
     doc["created_by"] = created_by
+    doc["slug"] = await generate_unique_slug(db, CONTENT_COLLECTION, data.title)
     doc["created_at"] = now
     doc["updated_at"] = now
     result = await db[CONTENT_COLLECTION].insert_one(doc)
@@ -99,9 +104,7 @@ async def list_content(
 
 async def get_content(content_id: str) -> CultureContentDetail:
     db = get_database()
-    if not ObjectId.is_valid(content_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contenu culturel introuvable")
-    doc = await db[CONTENT_COLLECTION].find_one({"_id": ObjectId(content_id)})
+    doc = await find_by_slug_or_id(db, CONTENT_COLLECTION, content_id)
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contenu culturel introuvable")
     return _content_to_detail(doc)

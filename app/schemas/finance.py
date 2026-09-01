@@ -35,6 +35,7 @@ class UpdateMoneyServiceRequest(BaseModel):
 class MoneyServiceSummary(BaseModel):
     id: str
     name: str
+    slug: str
     type: MoneyServiceType
     operator: Optional[str] = None
     region: str
@@ -46,6 +47,7 @@ class MoneyServiceSummary(BaseModel):
 class MoneyServiceDetail(BaseModel):
     id: str
     name: str
+    slug: str
     type: MoneyServiceType
     operator: Optional[str] = None
     region: str

@@ -39,6 +39,7 @@ class UpdateTransportProviderRequest(BaseModel):
 class TransportProviderSummary(BaseModel):
     id: str
     name: str
+    slug: str
     type: TransportType
     region: str
     province: Optional[str] = None
@@ -55,6 +56,7 @@ class TransportProviderDetail(BaseModel):
     id: str
     owner_id: str
     name: str
+    slug: str
     type: TransportType
     description: Optional[str] = None
     region: str

@@ -4,6 +4,7 @@ from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, status
 from app.core.database import get_database
+from app.utils.slug import generate_unique_slug, find_by_slug_or_id, ensure_slug_index
 from app.models.finance import MoneyServiceType, MoneyServiceStatus
 from app.schemas.finance import (
     CreateMoneyServiceRequest,
@@ -35,6 +36,7 @@ def _to_summary(doc: dict) -> MoneyServiceSummary:
     return MoneyServiceSummary(
         id=str(doc["_id"]),
         name=doc["name"],
+        slug=doc["slug"],
         type=doc["type"],
         operator=doc.get("operator"),
         region=doc["region"],
@@ -48,6 +50,7 @@ def _to_detail(doc: dict) -> MoneyServiceDetail:
     return MoneyServiceDetail(
         id=str(doc["_id"]),
         name=doc["name"],
+        slug=doc["slug"],
         type=doc["type"],
         operator=doc.get("operator"),
         region=doc["region"],
@@ -65,8 +68,10 @@ def _to_detail(doc: dict) -> MoneyServiceDetail:
 
 async def create_money_service(data: CreateMoneyServiceRequest) -> MoneyServiceDetail:
     db = get_database()
+    await ensure_slug_index(db, COLLECTION)
     now = datetime.utcnow()
     doc = data.model_dump()
+    doc["slug"] = await generate_unique_slug(db, COLLECTION, data.name)
     doc["status"] = MoneyServiceStatus.PUBLISHED.value
     doc["data_source"] = {"verified": False, "source": None, "last_updated_at": now}
     doc["created_at"] = now
@@ -121,9 +126,7 @@ async def list_money_services(
 
 async def get_money_service(service_id: str) -> MoneyServiceDetail:
     db = get_database()
-    if not ObjectId.is_valid(service_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Point de service introuvable")
-    doc = await db[COLLECTION].find_one({"_id": ObjectId(service_id)})
+    doc = await find_by_slug_or_id(db, COLLECTION, service_id)
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Point de service introuvable")
     return _to_detail(doc)

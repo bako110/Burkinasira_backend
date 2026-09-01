@@ -3,6 +3,7 @@ from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, status
 from app.core.database import get_database
+from app.utils.slug import generate_unique_slug, find_by_slug_or_id, ensure_slug_index
 from app.models.cuisine import EstablishmentType, DietaryTag, CuisineStatus
 from app.schemas.cuisine import (
     CreateRestaurantRequest,
@@ -19,6 +20,7 @@ def _to_summary(doc: dict) -> RestaurantSummary:
     return RestaurantSummary(
         id=str(doc["_id"]),
         name=doc["name"],
+        slug=doc["slug"],
         type=doc["type"],
         cuisine_style=doc.get("cuisine_style"),
         region=doc["region"],
@@ -36,6 +38,7 @@ def _to_detail(doc: dict) -> RestaurantDetail:
         id=str(doc["_id"]),
         owner_id=doc["owner_id"],
         name=doc["name"],
+        slug=doc["slug"],
         type=doc["type"],
         description=doc["description"],
         cuisine_style=doc.get("cuisine_style"),
@@ -66,9 +69,11 @@ def _to_detail(doc: dict) -> RestaurantDetail:
 
 async def create_restaurant(data: CreateRestaurantRequest, owner_id: str, is_admin: bool = False) -> RestaurantDetail:
     db = get_database()
+    await ensure_slug_index(db, COLLECTION)
     now = datetime.utcnow()
     doc = data.model_dump()
     doc["owner_id"] = owner_id
+    doc["slug"] = await generate_unique_slug(db, COLLECTION, data.name)
     doc["average_rating"] = 0.0
     doc["review_count"] = 0
     doc["is_verified"] = False
@@ -145,9 +150,7 @@ async def list_my_restaurants(owner_id: str) -> list:
 
 async def get_restaurant(restaurant_id: str) -> RestaurantDetail:
     db = get_database()
-    if not ObjectId.is_valid(restaurant_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Restaurant introuvable")
-    doc = await db[COLLECTION].find_one({"_id": ObjectId(restaurant_id)})
+    doc = await find_by_slug_or_id(db, COLLECTION, restaurant_id)
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Restaurant introuvable")
     return _to_detail(doc)

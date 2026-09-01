@@ -4,6 +4,7 @@ from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, status
 from app.core.database import get_database
+from app.utils.slug import generate_unique_slug, find_by_slug_or_id, ensure_slug_index
 from app.models.connectivity import ConnectivityPointType, ConnectivityPointStatus
 from app.schemas.connectivity import (
     CreateConnectivityPointRequest,
@@ -28,6 +29,7 @@ def _to_summary(doc: dict) -> ConnectivityPointSummary:
     return ConnectivityPointSummary(
         id=str(doc["_id"]),
         name=doc["name"],
+        slug=doc["slug"],
         type=doc["type"],
         operator=doc.get("operator"),
         region=doc["region"],
@@ -43,6 +45,7 @@ def _to_detail(doc: dict) -> ConnectivityPointDetail:
     return ConnectivityPointDetail(
         id=str(doc["_id"]),
         name=doc["name"],
+        slug=doc["slug"],
         type=doc["type"],
         operator=doc.get("operator"),
         region=doc["region"],
@@ -61,8 +64,10 @@ def _to_detail(doc: dict) -> ConnectivityPointDetail:
 
 async def create_point(data: CreateConnectivityPointRequest) -> ConnectivityPointDetail:
     db = get_database()
+    await ensure_slug_index(db, COLLECTION)
     now = datetime.utcnow()
     doc = data.model_dump()
+    doc["slug"] = await generate_unique_slug(db, COLLECTION, data.name)
     doc["status"] = ConnectivityPointStatus.PUBLISHED.value
     doc["data_source"] = {"verified": False, "source": None, "last_updated_at": now}
     doc["created_at"] = now
@@ -117,9 +122,7 @@ async def list_points(
 
 async def get_point(point_id: str) -> ConnectivityPointDetail:
     db = get_database()
-    if not ObjectId.is_valid(point_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Point de connectivité introuvable")
-    doc = await db[COLLECTION].find_one({"_id": ObjectId(point_id)})
+    doc = await find_by_slug_or_id(db, COLLECTION, point_id)
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Point de connectivité introuvable")
     return _to_detail(doc)

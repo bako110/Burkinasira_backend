@@ -49,6 +49,7 @@ class UpdateEventRequest(BaseModel):
 class EventSummary(BaseModel):
     id: str
     title: str
+    slug: str
     category: EventCategory
     region: str
     province: Optional[str] = None
@@ -65,6 +66,7 @@ class EventDetail(BaseModel):
     id: str
     organizer_id: str
     title: str
+    slug: str
     description: str
     category: EventCategory
     region: str

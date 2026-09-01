@@ -3,6 +3,7 @@ from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, status
 from app.core.database import get_database
+from app.utils.slug import generate_unique_slug, find_by_slug_or_id, ensure_slug_index
 from app.models.hotel import AccommodationType, HotelStatus
 from app.schemas.hotel import (
     CreateHotelRequest,
@@ -24,6 +25,7 @@ def _to_summary(doc: dict) -> HotelSummary:
     return HotelSummary(
         id=str(doc["_id"]),
         name=doc["name"],
+        slug=doc["slug"],
         type=doc["type"],
         region=doc["region"],
         province=doc.get("province"),
@@ -42,6 +44,7 @@ def _to_detail(doc: dict) -> HotelDetail:
         id=str(doc["_id"]),
         owner_id=doc["owner_id"],
         name=doc["name"],
+        slug=doc["slug"],
         type=doc["type"],
         description=doc["description"],
         region=doc["region"],
@@ -68,9 +71,11 @@ def _to_detail(doc: dict) -> HotelDetail:
 
 async def create_hotel(data: CreateHotelRequest, owner_id: str, is_admin: bool = False) -> HotelDetail:
     db = get_database()
+    await ensure_slug_index(db, COLLECTION)
     now = datetime.utcnow()
     doc = data.model_dump()
     doc["owner_id"] = owner_id
+    doc["slug"] = await generate_unique_slug(db, COLLECTION, data.name)
     doc["offers"] = []
     doc["average_rating"] = 0.0
     doc["review_count"] = 0
@@ -148,9 +153,7 @@ async def list_my_hotels(owner_id: str) -> list:
 
 async def get_hotel(hotel_id: str) -> HotelDetail:
     db = get_database()
-    if not ObjectId.is_valid(hotel_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hébergement introuvable")
-    doc = await db[COLLECTION].find_one({"_id": ObjectId(hotel_id)})
+    doc = await find_by_slug_or_id(db, COLLECTION, hotel_id)
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hébergement introuvable")
     return _to_detail(doc)

@@ -3,6 +3,7 @@ from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, status
 from app.core.database import get_database
+from app.utils.slug import generate_unique_slug, find_by_slug_or_id, ensure_slug_index
 from app.models.event import EventCategory, EventStatus
 from app.schemas.event import (
     CreateEventRequest,
@@ -19,6 +20,7 @@ def _to_summary(doc: dict) -> EventSummary:
     return EventSummary(
         id=str(doc["_id"]),
         title=doc["title"],
+        slug=doc["slug"],
         category=doc["category"],
         region=doc["region"],
         province=doc.get("province"),
@@ -37,6 +39,7 @@ def _to_detail(doc: dict) -> EventDetail:
         id=str(doc["_id"]),
         organizer_id=doc["organizer_id"],
         title=doc["title"],
+        slug=doc["slug"],
         description=doc["description"],
         category=doc["category"],
         region=doc["region"],
@@ -61,9 +64,11 @@ def _to_detail(doc: dict) -> EventDetail:
 
 async def create_event(data: CreateEventRequest, organizer_id: str) -> EventDetail:
     db = get_database()
+    await ensure_slug_index(db, COLLECTION)
     now = datetime.utcnow()
     doc = data.model_dump()
     doc["organizer_id"] = organizer_id
+    doc["slug"] = await generate_unique_slug(db, COLLECTION, data.title)
     doc["status"] = EventStatus.PUBLISHED.value
     doc["data_source"] = {"verified": False, "source": None, "last_updated_at": now}
     doc["created_at"] = now
@@ -113,9 +118,7 @@ async def list_events(
 
 async def get_event(event_id: str) -> EventDetail:
     db = get_database()
-    if not ObjectId.is_valid(event_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Événement introuvable")
-    doc = await db[COLLECTION].find_one({"_id": ObjectId(event_id)})
+    doc = await find_by_slug_or_id(db, COLLECTION, event_id)
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Événement introuvable")
     return _to_detail(doc)
