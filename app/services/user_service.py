@@ -1,3 +1,4 @@
+import secrets
 from datetime import datetime
 from typing import Optional
 from bson import ObjectId
@@ -15,6 +16,16 @@ from app.schemas.auth import (
 )
 
 COLLECTION = "users"
+
+_card_token_index_ensured = False
+
+
+async def _ensure_card_token_index(db) -> None:
+    global _card_token_index_ensured
+    if _card_token_index_ensured:
+        return
+    await db[COLLECTION].create_index("card_token", unique=True, sparse=True)
+    _card_token_index_ensured = True
 
 
 def _to_public(doc: dict) -> UserPublic:
@@ -128,17 +139,33 @@ async def get_user_by_id(user_id: str) -> UserPublic:
     return _to_public(doc)
 
 
-async def verify_user_card(user_id: str) -> UserVerification:
-    """Vérification publique d'une carte FasoViva à partir de son QR code.
-    N'expose aucune donnée sensible (pas d'email, pas de téléphone)."""
+async def get_or_create_card_token(user_id: str) -> str:
+    """Retourne le token opaque et non-devinable utilisé dans le QR code de la
+    carte FasoViva de cet utilisateur, en le générant s'il n'existe pas encore.
+    Ce token ne doit jamais permettre de retrouver ou d'énumérer l'ObjectId réel."""
     db = get_database()
+    await _ensure_card_token_index(db)
     if not ObjectId.is_valid(user_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Carte introuvable")
-    doc = await db[COLLECTION].find_one({"_id": ObjectId(user_id)})
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur introuvable")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(user_id)}, {"card_token": 1})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur introuvable")
+    if doc.get("card_token"):
+        return doc["card_token"]
+
+    token = secrets.token_urlsafe(24)
+    await db[COLLECTION].update_one({"_id": ObjectId(user_id)}, {"$set": {"card_token": token}})
+    return token
+
+
+async def verify_user_card(card_token: str) -> UserVerification:
+    """Vérification publique d'une carte FasoViva à partir de son QR code.
+    N'expose aucune donnée sensible (pas d'email, pas de téléphone, pas d'ObjectId)."""
+    db = get_database()
+    doc = await db[COLLECTION].find_one({"card_token": card_token})
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Carte introuvable")
     return UserVerification(
-        id=str(doc["_id"]),
         full_name=doc["full_name"],
         role=doc["role"],
         is_verified=doc.get("is_verified", False),

@@ -63,8 +63,8 @@ class UserPublic(BaseModel):
 
 class UserVerification(BaseModel):
     """Informations minimales exposées publiquement pour vérifier l'identité
-    d'un porteur de carte FasoViva (via le QR code) — pas d'email ni téléphone."""
-    id: str
+    d'un porteur de carte FasoViva (via le QR code) — pas d'email, pas de
+    téléphone, pas d'identifiant technique (ObjectId)."""
     full_name: str
     role: UserRole
     is_verified: bool
