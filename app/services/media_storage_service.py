@@ -32,7 +32,7 @@ EXTENSION_BY_CONTENT_TYPE = {
 UPLOAD_ROOT = Path(settings.UPLOAD_DIR)
 
 
-async def upload_media(file: UploadFile, folder: str = "fasoviva") -> dict:
+async def upload_media(file: UploadFile, folder: str = "burkinasira") -> dict:
     """Enregistre une image ou une vidéo sur le disque du serveur et retourne son URL publique."""
     content_type = file.content_type or ""
     is_image = content_type in ALLOWED_IMAGE_TYPES

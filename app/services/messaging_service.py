@@ -22,7 +22,7 @@ USERS_COLLECTION = "users"
 BOOKINGS_COLLECTION = "bookings"
 GUIDE_PROFILES_COLLECTION = "guide_profiles"
 
-SUPPORT_USER_ID = "fasoviva-support"
+SUPPORT_USER_ID = "fasoviva-support"  # identifiant technique stocké en base, ne pas renommer (casserait les conversations support existantes)
 
 # Pour ces types de conversation, le nom affiché doit être celui de
 # l'établissement réservé (hôtel, restaurant, artisan) plutôt que celui du
