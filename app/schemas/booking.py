@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 from app.models.booking import BookingItemType, BookingStatus
@@ -29,7 +29,10 @@ class CreateBookingRequest(BaseModel):
     @field_validator("scheduled_date")
     @classmethod
     def reject_past_date(cls, v: Optional[datetime]) -> Optional[datetime]:
-        if v is not None and v < datetime.utcnow():
+        if v is None:
+            return v
+        now = datetime.now(timezone.utc) if v.tzinfo is not None else datetime.utcnow()
+        if v < now:
             raise ValueError("La date de réservation ne peut pas être dans le passé")
         return v
 
