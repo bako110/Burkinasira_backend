@@ -23,13 +23,17 @@ async def list_restaurants(
     city: Optional[str] = None,
     dietary_tag: Optional[DietaryTag] = None,
     q: Optional[str] = Query(default=None, description="Recherche texte (nom, description, style)"),
+    near_lat: Optional[float] = Query(default=None, description="Latitude pour recherche par proximité"),
+    near_lng: Optional[float] = Query(default=None, description="Longitude pour recherche par proximité"),
+    radius_km: Optional[float] = Query(default=None, gt=0, description="Rayon de recherche en km"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ):
     """Filtrer les restaurants (famille, végétarien, budget, proximité) (§8)."""
     return await cuisine_service.list_restaurants(
         type=type, region=region, province=province, city=city, dietary_tag=dietary_tag,
-        q=q, page=page, page_size=page_size,
+        q=q, near_lat=near_lat, near_lng=near_lng, radius_km=radius_km,
+        page=page, page_size=page_size,
     )
 
 

@@ -22,13 +22,17 @@ async def list_events(
     province: Optional[str] = None,
     upcoming_only: bool = Query(default=True, description="Uniquement les événements à venir"),
     q: Optional[str] = Query(default=None, description="Recherche texte (titre, description)"),
+    near_lat: Optional[float] = Query(default=None, description="Latitude pour recherche par proximité"),
+    near_lng: Optional[float] = Query(default=None, description="Longitude pour recherche par proximité"),
+    radius_km: Optional[float] = Query(default=None, gt=0, description="Rayon de recherche en km"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ):
     """Rechercher / filtrer un événement (§17)."""
     return await event_service.list_events(
         category=category, region=region, province=province, upcoming_only=upcoming_only,
-        q=q, page=page, page_size=page_size,
+        q=q, near_lat=near_lat, near_lng=near_lng, radius_km=radius_km,
+        page=page, page_size=page_size,
     )
 
 

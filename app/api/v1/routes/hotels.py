@@ -26,13 +26,17 @@ async def list_hotels(
     max_price: Optional[float] = None,
     amenity: Optional[str] = None,
     q: Optional[str] = Query(default=None, description="Recherche texte (nom, description)"),
+    near_lat: Optional[float] = Query(default=None, description="Latitude pour recherche par proximité"),
+    near_lng: Optional[float] = Query(default=None, description="Longitude pour recherche par proximité"),
+    radius_km: Optional[float] = Query(default=None, gt=0, description="Rayon de recherche en km"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ):
     """Rechercher / filtrer des hébergements (§7)."""
     return await hotel_service.list_hotels(
         type=type, region=region, province=province, city=city, max_price=max_price,
-        amenity=amenity, q=q, page=page, page_size=page_size,
+        amenity=amenity, q=q, near_lat=near_lat, near_lng=near_lng, radius_km=radius_km,
+        page=page, page_size=page_size,
     )
 
 

@@ -4,6 +4,7 @@ from bson import ObjectId
 from fastapi import HTTPException, status
 from app.core.database import get_database
 from app.utils.slug import generate_unique_slug, find_by_slug_or_id, ensure_slug_index
+from app.utils.geo import filter_and_sort_by_distance
 from app.models.hotel import AccommodationType, HotelStatus
 from app.schemas.hotel import (
     CreateHotelRequest,
@@ -104,6 +105,9 @@ async def list_hotels(
     max_price: Optional[float] = None,
     amenity: Optional[str] = None,
     q: Optional[str] = None,
+    near_lat: Optional[float] = None,
+    near_lng: Optional[float] = None,
+    radius_km: Optional[float] = None,
     page: int = 1,
     page_size: int = 20,
 ) -> HotelListResponse:
@@ -128,10 +132,19 @@ async def list_hotels(
             {"description": {"$regex": q, "$options": "i"}},
         ]
 
-    total = await db[COLLECTION].count_documents(query)
-    skip = (page - 1) * page_size
-    cursor = db[COLLECTION].find(query).skip(skip).limit(page_size)
-    docs = await cursor.to_list(length=page_size)
+    near = near_lat is not None and near_lng is not None
+    if near:
+        # Filtrage par proximité : on récupère tout ce qui matche, puis on
+        # filtre/trie par distance et on pagine en mémoire.
+        all_docs = await db[COLLECTION].find(query).to_list(length=None)
+        all_docs = filter_and_sort_by_distance(all_docs, near_lat, near_lng, radius_km, "location")
+        total = len(all_docs)
+        start = (page - 1) * page_size
+        docs = all_docs[start:start + page_size]
+    else:
+        total = await db[COLLECTION].count_documents(query)
+        skip = (page - 1) * page_size
+        docs = await db[COLLECTION].find(query).skip(skip).limit(page_size).to_list(length=page_size)
 
     return HotelListResponse(
         items=[_to_summary(d) for d in docs],

@@ -24,6 +24,9 @@ async def list_providers(
     region: Optional[str] = None,
     province: Optional[str] = None,
     include_all_statuses: bool = False,
+    near_lat: Optional[float] = Query(default=None, description="Latitude pour recherche par proximité"),
+    near_lng: Optional[float] = Query(default=None, description="Longitude pour recherche par proximité"),
+    radius_km: Optional[float] = Query(default=None, gt=0, description="Rayon de recherche en km"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     current_user: Optional[TokenPayload] = Depends(get_current_user_optional),
@@ -31,7 +34,9 @@ async def list_providers(
     """Rechercher un trajet : taxis/VTC, chauffeurs privés, location, transferts aéroport (§11)."""
     is_admin = current_user is not None and current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
     return await mobility_service.list_providers(
-        type=type, region=region, province=province, page=page, page_size=page_size,
+        type=type, region=region, province=province,
+        near_lat=near_lat, near_lng=near_lng, radius_km=radius_km,
+        page=page, page_size=page_size,
         include_all_statuses=include_all_statuses and is_admin,
     )
 

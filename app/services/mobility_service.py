@@ -4,6 +4,7 @@ from bson import ObjectId
 from fastapi import HTTPException, status
 from app.core.database import get_database
 from app.utils.slug import generate_unique_slug, find_by_slug_or_id, ensure_slug_index
+from app.utils.geo import filter_and_sort_by_distance
 from app.models.mobility import TransportType, TransportProviderStatus, TripRequestStatus
 from app.schemas.mobility import (
     CreateTransportProviderRequest,
@@ -87,6 +88,9 @@ async def list_providers(
     region: Optional[str] = None,
     province: Optional[str] = None,
     include_all_statuses: bool = False,
+    near_lat: Optional[float] = None,
+    near_lng: Optional[float] = None,
+    radius_km: Optional[float] = None,
     page: int = 1,
     page_size: int = 20,
 ) -> TransportProviderListResponse:
@@ -99,9 +103,17 @@ async def list_providers(
     if province:
         query["province"] = province
 
-    total = await db[PROVIDERS_COLLECTION].count_documents(query)
-    skip = (page - 1) * page_size
-    docs = await db[PROVIDERS_COLLECTION].find(query).skip(skip).limit(page_size).to_list(length=page_size)
+    if near_lat is not None and near_lng is not None:
+        all_docs = await db[PROVIDERS_COLLECTION].find(query).to_list(length=None)
+        # Un transporteur est localisé par sa base d'exploitation (base_location).
+        all_docs = filter_and_sort_by_distance(all_docs, near_lat, near_lng, radius_km, "base_location")
+        total = len(all_docs)
+        start = (page - 1) * page_size
+        docs = all_docs[start:start + page_size]
+    else:
+        total = await db[PROVIDERS_COLLECTION].count_documents(query)
+        skip = (page - 1) * page_size
+        docs = await db[PROVIDERS_COLLECTION].find(query).skip(skip).limit(page_size).to_list(length=page_size)
 
     return TransportProviderListResponse(
         items=[_provider_to_summary(d) for d in docs],
