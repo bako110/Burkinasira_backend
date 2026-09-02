@@ -20,6 +20,14 @@ COLLECTION = "trips"
 _token_index_ensured = False
 
 
+def _dates_to_datetimes(fields: dict) -> None:
+    """BSON ne sait pas encoder datetime.date — convertit en datetime à minuit avant insertion/mise à jour."""
+    for key in ("start_date", "end_date"):
+        value = fields.get(key)
+        if isinstance(value, date) and not isinstance(value, datetime):
+            fields[key] = datetime.combine(value, datetime.min.time())
+
+
 async def _ensure_token_index(db) -> None:
     global _token_index_ensured
     if _token_index_ensured:
@@ -90,6 +98,7 @@ async def create_trip(data: CreateTripRequest, owner_id: str) -> TripDetail:
     await _ensure_token_index(db)
     now = datetime.utcnow()
     doc = data.model_dump()
+    _dates_to_datetimes(doc)
     doc["owner_id"] = owner_id
     doc["days"] = []
     doc["linked_booking_ids"] = []
@@ -132,6 +141,7 @@ async def update_trip(trip_id: str, data: UpdateTripRequest, user_id: str) -> Tr
 
     update_fields = data.model_dump(exclude_unset=True, exclude_none=True)
     if update_fields:
+        _dates_to_datetimes(update_fields)
         update_fields["updated_at"] = datetime.utcnow()
         await db[COLLECTION].update_one({"_id": ObjectId(trip_id)}, {"$set": update_fields})
 
