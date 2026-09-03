@@ -173,12 +173,14 @@ async def login_with_google(data: GoogleLoginRequest) -> TokenResponse:
             )
             doc["google_sub"] = google_sub
 
+    is_new = False
     if not doc:
         if not email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Le compte Google ne fournit pas d'adresse email",
             )
+        is_new = True
         new_doc = {
             "full_name": full_name,
             "email": email,
@@ -187,6 +189,7 @@ async def login_with_google(data: GoogleLoginRequest) -> TokenResponse:
             "google_sub": google_sub,
             "auth_provider": "google",
             "role": data.role.value,
+            "role_chosen": data.role != UserRole.TOURIST,
             "status": UserStatus.ACTIVE.value,
             # Google a déjà vérifié l'email : on démarre le compte comme vérifié
             # au sens "email confirmé" (la vérification de documents reste à part).
@@ -206,12 +209,27 @@ async def login_with_google(data: GoogleLoginRequest) -> TokenResponse:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Ce compte est suspendu ou supprimé",
             )
-        await db[COLLECTION].update_one({"_id": doc["_id"]}, {"$set": {"last_login_at": now}})
+        updates: dict = {"last_login_at": now}
+        # Choix du rôle en 2e temps (écran post-connexion Google) : autorisé une
+        # seule fois, tant que le compte Google est encore "tourist" et que le
+        # rôle n'a pas déjà été confirmé.
+        if (
+            data.role != UserRole.TOURIST
+            and not doc.get("role_chosen")
+            and doc.get("role") == UserRole.TOURIST.value
+            and doc.get("auth_provider") == "google"
+        ):
+            updates["role"] = data.role.value
+            updates["role_chosen"] = True
+            doc["role"] = data.role.value
+        await db[COLLECTION].update_one({"_id": doc["_id"]}, {"$set": updates})
 
     token, expires_at = create_access_token(
         user_id=str(doc["_id"]), email=doc["email"], role=UserRole(doc["role"])
     )
-    return TokenResponse(access_token=token, expires_at=expires_at, user=_to_public(doc))
+    return TokenResponse(
+        access_token=token, expires_at=expires_at, user=_to_public(doc), is_new=is_new
+    )
 
 
 async def get_user_by_id(user_id: str) -> UserPublic:

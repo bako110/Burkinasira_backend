@@ -121,3 +121,6 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_at: datetime
     user: UserPublic
+    # True seulement quand /auth/google vient de CRÉER le compte : le client
+    # peut alors proposer l'écran de choix du rôle (touriste / guide / prestataire).
+    is_new: bool = False
