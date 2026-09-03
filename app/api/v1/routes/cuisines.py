@@ -54,12 +54,12 @@ async def get_restaurant(restaurant_id: str):
 @router.post("", response_model=RestaurantDetail, status_code=status.HTTP_201_CREATED)
 async def create_restaurant(
     data: CreateRestaurantRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN, UserRole.MODERATOR)),
 ):
-    """(Provider) Ajouter un restaurant. Publié directement si le compte est déjà
+    """(Provider/Admin/Moderateur) Ajouter un restaurant. Publié directement si le compte est déjà
     vérifié, sinon enregistré en brouillon en attendant l'approbation admin."""
     return await cuisine_service.create_restaurant(
-        data, owner_id=current_user.sub, is_admin=current_user.role == UserRole.ADMIN
+        data, owner_id=current_user.sub, is_admin=current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
     )
 
 

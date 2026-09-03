@@ -113,9 +113,9 @@ async def delete_my_guide_profile(
 async def update_guide_profile_by_id(
     guide_id: str,
     data: UpdateGuideProfileRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
-    """(Admin) Mettre à jour le profil d'un guide par son identifiant."""
+    """(Admin/Moderateur) Mettre à jour le profil d'un guide par son identifiant."""
     return await guide_service.update_guide_profile_by_id(guide_id, data)
 
 

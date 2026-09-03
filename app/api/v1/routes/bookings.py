@@ -69,11 +69,11 @@ async def get_booking(booking_id: str, current_user: TokenPayload = Depends(get_
 @router.post("/{booking_id}/confirm", response_model=BookingResponse)
 async def confirm_booking(
     booking_id: str,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.PROVIDER, UserRole.GUIDE)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR, UserRole.PROVIDER, UserRole.GUIDE)),
 ):
-    """(Admin, ou le prestataire propriétaire de l'item) Confirmer une réservation."""
+    """(Admin/Moderateur, ou le prestataire propriétaire de l'item) Confirmer une réservation."""
     return await booking_service.confirm_booking(
-        booking_id, current_user.sub, is_admin=current_user.role == UserRole.ADMIN
+        booking_id, current_user.sub, is_admin=current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
     )
 
 

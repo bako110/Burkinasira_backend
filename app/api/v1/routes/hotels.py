@@ -63,12 +63,12 @@ async def check_availability(hotel_id: str, data: AvailabilityCheckRequest):
 @router.post("", response_model=HotelDetail, status_code=status.HTTP_201_CREATED)
 async def create_hotel(
     data: CreateHotelRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN, UserRole.MODERATOR)),
 ):
-    """(Provider) Ajouter un hébergement. Publié directement si le compte est déjà
+    """(Provider/Admin/Moderateur) Ajouter un hébergement. Publié directement si le compte est déjà
     vérifié, sinon enregistré en brouillon en attendant l'approbation admin."""
     return await hotel_service.create_hotel(
-        data, owner_id=current_user.sub, is_admin=current_user.role == UserRole.ADMIN
+        data, owner_id=current_user.sub, is_admin=current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
     )
 
 
@@ -80,7 +80,7 @@ async def update_hotel(
 ):
     """(Owner/Admin) Mettre à jour un hébergement."""
     return await hotel_service.update_hotel(
-        hotel_id, data, current_user.sub, is_admin=current_user.role == UserRole.ADMIN
+        hotel_id, data, current_user.sub, is_admin=current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
     )
 
 

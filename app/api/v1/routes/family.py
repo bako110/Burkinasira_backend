@@ -44,9 +44,9 @@ async def get_family_service(service_id: str):
 @router.post("", response_model=FamilyServiceDetail, status_code=status.HTTP_201_CREATED)
 async def create_family_service(
     data: CreateFamilyServiceRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.PROVIDER)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.PROVIDER, UserRole.MODERATOR)),
 ):
-    """(Provider/Admin) Référencer un service familial."""
+    """(Provider/Admin/Moderateur) Référencer un service familial."""
     return await family_service.create_family_service(data)
 
 
@@ -54,9 +54,9 @@ async def create_family_service(
 async def update_family_service(
     service_id: str,
     data: UpdateFamilyServiceRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.PROVIDER)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.PROVIDER, UserRole.MODERATOR)),
 ):
-    """(Provider/Admin) Mettre à jour un service familial."""
+    """(Provider/Admin/Moderateur) Mettre à jour un service familial."""
     return await family_service.update_family_service(service_id, data)
 
 

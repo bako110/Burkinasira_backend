@@ -39,9 +39,9 @@ async def get_outing(outing_id: str):
 @router.post("/outings", response_model=OutingResponse, status_code=status.HTTP_201_CREATED)
 async def create_outing(
     data: CreateOutingRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.GUIDE, UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.GUIDE, UserRole.ADMIN, UserRole.MODERATOR)),
 ):
-    """(Provider/Guide/Admin) Publier une sortie éducative."""
+    """(Provider/Guide/Admin/Moderateur) Publier une sortie éducative."""
     return await edu_service.create_outing(data, organizer_id=current_user.sub)
 
 

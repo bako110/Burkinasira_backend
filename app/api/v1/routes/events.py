@@ -45,9 +45,9 @@ async def get_event(event_id: str):
 @router.post("", response_model=EventDetail, status_code=status.HTTP_201_CREATED)
 async def create_event(
     data: CreateEventRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN, UserRole.MODERATOR)),
 ):
-    """(Provider/Admin) Publier un événement."""
+    """(Provider/Admin/Moderateur) Publier un événement."""
     return await event_service.create_event(data, organizer_id=current_user.sub)
 
 

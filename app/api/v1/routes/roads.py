@@ -51,9 +51,9 @@ async def get_road_service(service_id: str):
 @router.post("", response_model=RoadServiceDetail, status_code=status.HTTP_201_CREATED)
 async def create_road_service(
     data: CreateRoadServiceRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN, UserRole.MODERATOR)),
 ):
-    """(Provider/Admin) Référencer un service automobile ou routier."""
+    """(Provider/Admin/Moderateur) Référencer un service automobile ou routier."""
     return await roads_service.create_road_service(data)
 
 
@@ -61,9 +61,9 @@ async def create_road_service(
 async def update_road_service(
     service_id: str,
     data: UpdateRoadServiceRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN, UserRole.MODERATOR)),
 ):
-    """(Provider/Admin) Mettre à jour un service."""
+    """(Provider/Admin/Moderateur) Mettre à jour un service."""
     return await roads_service.update_road_service(service_id, data)
 
 

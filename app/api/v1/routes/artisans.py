@@ -155,10 +155,10 @@ async def create_product(
 async def update_product(
     product_id: str,
     data: UpdateProductRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN, UserRole.MODERATOR)),
 ):
-    """(Vendeur) Mettre à jour un produit, gérer les stocks. (Admin) Mettre à jour n'importe quel produit."""
-    if current_user.role == UserRole.ADMIN:
+    """(Vendeur) Mettre à jour un produit, gérer les stocks. (Admin/Moderateur) Mettre à jour n'importe quel produit."""
+    if current_user.role in (UserRole.ADMIN, UserRole.MODERATOR):
         return await artisan_service.update_product(product_id, data, current_artisan_id=None, is_admin=True)
     artisan = await artisan_service.get_artisan_by_user_id(current_user.sub)
     return await artisan_service.update_product(product_id, data, current_artisan_id=artisan.id)

@@ -38,9 +38,9 @@ async def get_experience(experience_id: str):
 @router.post("", response_model=ExperienceDetail, status_code=status.HTTP_201_CREATED)
 async def create_experience(
     data: CreateExperienceRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.GUIDE, UserRole.PROVIDER, UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.GUIDE, UserRole.PROVIDER, UserRole.ADMIN, UserRole.MODERATOR)),
 ):
-    """(Guide/Provider) Publier une expérience communautaire."""
+    """(Guide/Provider/Admin/Moderateur) Publier une expérience communautaire."""
     host = await user_service.get_user_by_id(current_user.sub)
     return await experience_service.create_experience(data, host_id=current_user.sub, host_name=host.full_name)
 

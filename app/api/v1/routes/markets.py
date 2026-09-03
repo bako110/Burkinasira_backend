@@ -39,9 +39,9 @@ async def get_marketplace(marketplace_id: str):
 @router.post("", response_model=MarketPlaceDetail, status_code=status.HTTP_201_CREATED)
 async def create_marketplace(
     data: CreateMarketPlaceRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.PROVIDER)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.PROVIDER, UserRole.MODERATOR)),
 ):
-    """(Provider/Admin) Référencer un marché ou un commerce local."""
+    """(Provider/Admin/Moderateur) Référencer un marché ou un commerce local."""
     return await market_service.create_marketplace(data)
 
 
@@ -49,9 +49,9 @@ async def create_marketplace(
 async def update_marketplace(
     marketplace_id: str,
     data: UpdateMarketPlaceRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.PROVIDER)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.PROVIDER, UserRole.MODERATOR)),
 ):
-    """(Provider/Admin) Mettre à jour un marché/commerce, publier une offre."""
+    """(Provider/Admin/Moderateur) Mettre à jour un marché/commerce, publier une offre."""
     return await market_service.update_marketplace(marketplace_id, data)
 
 
