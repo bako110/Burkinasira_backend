@@ -44,6 +44,7 @@ async def get_application(application_id: str, current_user: TokenPayload = Depe
     return await operator_service.get_application(application_id, current_user.sub, is_admin=current_user.role == UserRole.ADMIN)
 
 
+# Left ADMIN-only: validates/suspends a professional operator, a sensitive identity/trust action.
 @router.patch("/applications/{application_id}", response_model=OperatorApplicationResponse)
 async def review_application(
     application_id: str,

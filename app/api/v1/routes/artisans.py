@@ -80,7 +80,7 @@ async def delete_my_artisan_profile(
 async def update_artisan_by_id(
     artisan_id: str,
     data: UpdateArtisanRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Mettre à jour le profil d'un artisan par son identifiant."""
     return await artisan_service.update_artisan_by_id(artisan_id, data)
@@ -95,6 +95,7 @@ async def delete_artisan(
     await artisan_service.delete_artisan(current_user.sub, is_admin=True, target_artisan_id=artisan_id)
 
 
+# Left ADMIN-only: verification/trust status change on a provider account, not content management.
 @router.post("/artisans/{artisan_id}/verify", response_model=ArtisanResponse)
 async def verify_artisan(
     artisan_id: str,

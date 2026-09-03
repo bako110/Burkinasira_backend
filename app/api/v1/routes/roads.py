@@ -89,7 +89,7 @@ async def report_breakdown(
 async def assign_breakdown(
     report_id: str,
     data: AssignBreakdownRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Assigner un signalement de panne à un service."""
     return await roads_service.assign_breakdown(report_id, data.service_id)

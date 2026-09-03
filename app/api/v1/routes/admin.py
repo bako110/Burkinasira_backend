@@ -41,6 +41,7 @@ async def list_users(
     return await admin_service.list_users(role, status_filter)
 
 
+# Left ADMIN-only: suspends/reactivates a user account, a sensitive identity/trust action.
 @router.patch("/users/{user_id}/status", response_model=AdminUserSummary)
 async def change_user_status(
     user_id: str,
@@ -51,6 +52,7 @@ async def change_user_status(
     return await admin_service.change_user_status(user_id, data, actor_id=current_user.sub)
 
 
+# Left ADMIN-only: changes a user's role, a sensitive identity/permissions action.
 @router.patch("/users/{user_id}/role", response_model=AdminUserSummary)
 async def change_user_role(
     user_id: str,
@@ -67,6 +69,7 @@ async def list_commissions(current_user: TokenPayload = Depends(require_role(Use
     return await admin_service.list_commissions()
 
 
+# Left ADMIN-only: platform commission rate configuration, a financial settlement setting.
 @router.put("/commissions", response_model=CommissionResponse)
 async def set_commission(
     data: SetCommissionRequest,

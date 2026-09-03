@@ -33,7 +33,7 @@ async def get_forecast(region: str, days: int = 5):
 @router.post("/snapshots", response_model=WeatherSnapshotResponse, status_code=status.HTTP_201_CREATED)
 async def create_snapshot(
     data: CreateWeatherSnapshotRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Publier un relevé/prévision météo (alimenté par intégration ou saisie manuelle)."""
     return await weather_service.create_snapshot(data)
@@ -48,7 +48,7 @@ async def list_active_alerts(region: Optional[str] = None):
 @router.post("/alerts", response_model=WeatherAlertResponse, status_code=status.HTTP_201_CREATED)
 async def create_alert(
     data: CreateWeatherAlertRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Publier une alerte météo/environnementale."""
     return await weather_service.create_alert(data, published_by=current_user.sub)
@@ -58,7 +58,7 @@ async def create_alert(
 async def update_alert(
     alert_id: str,
     data: UpdateWeatherAlertRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Mettre à jour une alerte météo/environnementale."""
     return await weather_service.update_alert(alert_id, data)

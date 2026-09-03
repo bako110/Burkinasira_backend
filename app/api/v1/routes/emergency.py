@@ -24,7 +24,7 @@ async def list_emergency_contacts(region: Optional[str] = None):
 @router.post("/contacts", response_model=EmergencyContactResponse, status_code=status.HTTP_201_CREATED)
 async def create_emergency_contact(
     data: CreateEmergencyContactRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Ajouter un numéro officiel."""
     return await emergency_service.create_contact(data)
@@ -34,7 +34,7 @@ async def create_emergency_contact(
 async def update_emergency_contact(
     contact_id: str,
     data: UpdateEmergencyContactRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Mettre à jour un numéro officiel."""
     return await emergency_service.update_contact(contact_id, data)

@@ -128,6 +128,7 @@ async def delete_guide_profile(
     await guide_service.delete_guide_profile(current_user.sub, is_admin=True, target_guide_id=guide_id)
 
 
+# Left ADMIN-only: verification/trust status change on a guide account, not content management.
 @router.post("/{guide_id}/verify", response_model=GuideDetail)
 async def verify_guide(
     guide_id: str,
@@ -138,6 +139,7 @@ async def verify_guide(
     return await guide_service.set_verification_status(guide_id, is_verified)
 
 
+# Left ADMIN-only: professional account approval/activation, a sensitive identity/trust action.
 @router.post("/{guide_id}/approve", response_model=GuideDetail)
 async def approve_guide(
     guide_id: str,
@@ -147,6 +149,7 @@ async def approve_guide(
     return await guide_service.approve_guide(guide_id)
 
 
+# Left ADMIN-only: professional account rejection, a sensitive identity/trust action.
 @router.post("/{guide_id}/reject", response_model=GuideDetail)
 async def reject_guide(
     guide_id: str,

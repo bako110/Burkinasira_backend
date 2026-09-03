@@ -64,7 +64,7 @@ async def get_money_service(service_id: str):
 @router.post("", response_model=MoneyServiceDetail, status_code=status.HTTP_201_CREATED)
 async def create_money_service(
     data: CreateMoneyServiceRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Référencer un point banque/DAB/change."""
     return await finance_service.create_money_service(data)
@@ -74,7 +74,7 @@ async def create_money_service(
 async def update_money_service(
     service_id: str,
     data: UpdateMoneyServiceRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Mettre à jour un point banque/DAB/change."""
     return await finance_service.update_money_service(service_id, data)

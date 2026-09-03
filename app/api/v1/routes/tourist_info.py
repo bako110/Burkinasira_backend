@@ -32,7 +32,7 @@ async def get_travel_info(info_id: str):
 @router.post("/travel-info", response_model=TravelInfoResponse, status_code=status.HTTP_201_CREATED)
 async def create_travel_info(
     data: CreateTravelInfoRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Publier une information administrative officielle."""
     return await tourist_info_service.create_travel_info(data)
@@ -42,7 +42,7 @@ async def create_travel_info(
 async def update_travel_info(
     info_id: str,
     data: UpdateTravelInfoRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Mettre à jour une information administrative."""
     return await tourist_info_service.update_travel_info(info_id, data)
@@ -66,7 +66,7 @@ async def list_diplomatic_contacts(country: Optional[str] = None):
 @router.post("/diplomatic-contacts", response_model=DiplomaticContactResponse, status_code=status.HTTP_201_CREATED)
 async def create_diplomatic_contact(
     data: CreateDiplomaticContactRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Ajouter un contact diplomatique."""
     return await tourist_info_service.create_diplomatic_contact(data)
@@ -76,7 +76,7 @@ async def create_diplomatic_contact(
 async def update_diplomatic_contact(
     contact_id: str,
     data: UpdateDiplomaticContactRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Mettre à jour un contact diplomatique."""
     return await tourist_info_service.update_diplomatic_contact(contact_id, data)

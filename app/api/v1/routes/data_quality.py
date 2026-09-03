@@ -47,7 +47,7 @@ async def moderate_error_report(
 @router.post("/duplicates/detect", response_model=list)
 async def detect_duplicates(
     item_type: str,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Détecter les doublons potentiels pour un type de fiche."""
     return await data_quality_service.detect_duplicates(item_type)
@@ -67,7 +67,7 @@ async def list_duplicates(
 async def resolve_duplicate(
     duplicate_id: str,
     data: ResolveDuplicateRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Marquer un doublon comme résolu."""
     return await data_quality_service.resolve_duplicate(duplicate_id, data)

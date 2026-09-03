@@ -35,7 +35,7 @@ async def get_airport(airport_id: str):
 @router.post("/airports", response_model=AirportResponse, status_code=status.HTTP_201_CREATED)
 async def create_airport(
     data: CreateAirportRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Ajouter un aéroport."""
     return await airport_service.create_airport(data)
@@ -45,7 +45,7 @@ async def create_airport(
 async def update_airport(
     airport_id: str,
     data: UpdateAirportRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Mettre à jour un aéroport."""
     return await airport_service.update_airport(airport_id, data)
@@ -70,7 +70,7 @@ async def list_airport_info(airport_id: str, category: Optional[AirportInfoCateg
 async def add_airport_info(
     airport_id: str,
     data: CreateAirportInfoRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Ajouter un bloc d'information pour un aéroport."""
     return await airport_service.add_airport_info(airport_id, data)
@@ -80,7 +80,7 @@ async def add_airport_info(
 async def update_airport_info(
     info_id: str,
     data: UpdateAirportInfoRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Mettre à jour un bloc d'information aéroport."""
     return await airport_service.update_airport_info(info_id, data)
@@ -104,7 +104,7 @@ async def list_border_crossings(region: Optional[str] = None):
 @router.post("/borders", response_model=BorderCrossingResponse, status_code=status.HTTP_201_CREATED)
 async def create_border_crossing(
     data: CreateBorderCrossingRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Ajouter un point de frontière."""
     return await airport_service.create_border_crossing(data)
@@ -120,7 +120,7 @@ async def get_border_crossing(border_id: str):
 async def update_border_crossing(
     border_id: str,
     data: UpdateBorderCrossingRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Mettre à jour un point de frontière."""
     return await airport_service.update_border_crossing(border_id, data)

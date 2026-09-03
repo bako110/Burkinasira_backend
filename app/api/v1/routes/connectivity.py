@@ -42,7 +42,7 @@ async def get_connectivity_point(point_id: str):
 @router.post("", response_model=ConnectivityPointDetail, status_code=status.HTTP_201_CREATED)
 async def create_connectivity_point(
     data: CreateConnectivityPointRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Référencer un point de connectivité."""
     return await connectivity_service.create_point(data)
@@ -52,7 +52,7 @@ async def create_connectivity_point(
 async def update_connectivity_point(
     point_id: str,
     data: UpdateConnectivityPointRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Mettre à jour un point de connectivité."""
     return await connectivity_service.update_point(point_id, data)

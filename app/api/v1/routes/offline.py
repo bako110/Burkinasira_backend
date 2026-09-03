@@ -31,7 +31,7 @@ async def get_package(package_id: str):
 @router.post("/packages", response_model=OfflinePackageResponse, status_code=status.HTTP_201_CREATED)
 async def create_package(
     data: CreateOfflinePackageRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Publier un package hors-ligne."""
     return await offline_service.create_package(data)
@@ -41,7 +41,7 @@ async def create_package(
 async def update_package(
     package_id: str,
     data: UpdateOfflinePackageRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Mettre à jour un package (avec incrément de version optionnel)."""
     return await offline_service.update_package(package_id, data)

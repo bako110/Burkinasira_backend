@@ -18,6 +18,7 @@ async def list_rules(current_user: TokenPayload = Depends(require_role(UserRole.
     return await revenue_split_service.list_rules()
 
 
+# Left ADMIN-only: revenue split rule configuration, a financial settlement setting.
 @router.put("/rules", response_model=RevenueSplitRuleResponse)
 async def set_rule(
     data: CreateRevenueSplitRuleRequest,

@@ -42,6 +42,7 @@ async def list_pending_verifications(current_user: TokenPayload = Depends(requir
     return await verified_service.list_pending_verifications()
 
 
+# Left ADMIN-only: approves/rejects an identity verification request, a sensitive identity/trust action.
 @router.patch("/verification-requests/{request_id}", response_model=VerificationRequestResponse)
 async def review_verification(
     request_id: str,
@@ -52,6 +53,7 @@ async def review_verification(
     return await verified_service.review_verification(request_id, data, reviewer_id=current_user.sub)
 
 
+# Left ADMIN-only: approves/rejects a user's professional account status, a sensitive identity/trust action.
 @router.patch("/accounts/{user_id}/review", response_model=PendingAccountSummary)
 async def review_account(
     user_id: str,

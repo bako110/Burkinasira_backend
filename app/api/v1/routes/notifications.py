@@ -26,7 +26,7 @@ async def list_my_notifications(
 @router.post("", response_model=Optional[NotificationResponse], status_code=status.HTTP_201_CREATED)
 async def create_notification(
     data: CreateNotificationRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin/Système) Émettre une notification vers un utilisateur (null si la catégorie est désactivée par l'utilisateur)."""
     return await notification_service.create_notification(data)

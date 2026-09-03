@@ -42,6 +42,7 @@ async def list_retention_policies():
     return await privacy_service.list_retention_policies()
 
 
+# Left ADMIN-only: data retention/compliance policy configuration, needs a product decision before opening to moderators.
 @router.put("/retention-policies", response_model=RetentionPolicyResponse)
 async def set_retention_policy(
     data: CreateRetentionPolicyRequest,

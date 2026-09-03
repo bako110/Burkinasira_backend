@@ -88,6 +88,7 @@ async def delete_provider(
     )
 
 
+# Left ADMIN-only: verification/trust status change on a provider account, not content management.
 @router.post("/providers/{provider_id}/verify", response_model=TransportProviderDetail)
 async def verify_provider(
     provider_id: str,

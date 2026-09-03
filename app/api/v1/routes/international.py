@@ -27,7 +27,7 @@ async def list_guide_entries(
 @router.post("/first-visit-guide", response_model=GuideEntryResponse, status_code=status.HTTP_201_CREATED)
 async def create_guide_entry(
     data: CreateGuideEntryRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Publier une entrée du guide de première visite."""
     return await international_service.create_guide_entry(data)
@@ -37,7 +37,7 @@ async def create_guide_entry(
 async def update_guide_entry(
     entry_id: str,
     data: UpdateGuideEntryRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Mettre à jour une entrée du guide."""
     return await international_service.update_guide_entry(entry_id, data)
@@ -62,7 +62,7 @@ async def list_supported_languages():
 async def set_language_active(
     code: str,
     is_active: bool,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Activer/désactiver une langue de l'application."""
     return await international_service.set_language_active(code, is_active)

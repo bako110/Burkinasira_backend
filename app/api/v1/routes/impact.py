@@ -79,7 +79,7 @@ async def list_indicators():
 @router.post("/indicators", response_model=IndicatorResponse, status_code=status.HTTP_201_CREATED)
 async def create_or_update_indicator(
     data: CreateIndicatorRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Créer/mettre à jour un indicateur d'impact."""
     return await impact_service.create_or_update_indicator(data)

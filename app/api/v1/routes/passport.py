@@ -39,7 +39,7 @@ async def list_badges():
 @router.post("/badges", response_model=BadgeResponse, status_code=status.HTTP_201_CREATED)
 async def create_badge(
     data: CreateBadgeRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Créer un badge."""
     return await passport_service.create_badge(data)
@@ -54,7 +54,7 @@ async def list_active_challenges():
 @router.post("/challenges", response_model=ChallengeResponse, status_code=status.HTTP_201_CREATED)
 async def create_challenge(
     data: CreateChallengeRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
     """(Admin) Créer un défi."""
     return await passport_service.create_challenge(data)
