@@ -51,8 +51,8 @@ async def update_outing(
     data: UpdateOutingRequest,
     current_user: TokenPayload = Depends(get_current_user),
 ):
-    """(Organisateur/Admin) Mettre à jour une sortie éducative."""
-    return await edu_service.update_outing(outing_id, data, current_user.sub, is_admin=current_user.role == UserRole.ADMIN)
+    """(Organisateur/Admin/Moderateur) Mettre à jour une sortie éducative."""
+    return await edu_service.update_outing(outing_id, data, current_user.sub, is_admin=current_user.role in (UserRole.ADMIN, UserRole.MODERATOR))
 
 
 @router.delete("/outings/{outing_id}", status_code=status.HTTP_204_NO_CONTENT)

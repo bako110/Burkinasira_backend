@@ -69,9 +69,9 @@ async def update_restaurant(
     data: UpdateRestaurantRequest,
     current_user: TokenPayload = Depends(get_current_user),
 ):
-    """(Owner/Admin) Mettre à jour un restaurant."""
+    """(Owner/Admin/Moderateur) Mettre à jour un restaurant."""
     return await cuisine_service.update_restaurant(
-        restaurant_id, data, current_user.sub, is_admin=current_user.role == UserRole.ADMIN
+        restaurant_id, data, current_user.sub, is_admin=current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
     )
 
 

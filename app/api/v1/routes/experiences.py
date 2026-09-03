@@ -51,9 +51,9 @@ async def update_experience(
     data: UpdateExperienceRequest,
     current_user: TokenPayload = Depends(get_current_user),
 ):
-    """(Hôte/Admin) Mettre à jour une expérience."""
+    """(Hôte/Admin/Moderateur) Mettre à jour une expérience."""
     return await experience_service.update_experience(
-        experience_id, data, current_user.sub, is_admin=current_user.role == UserRole.ADMIN
+        experience_id, data, current_user.sub, is_admin=current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
     )
 
 

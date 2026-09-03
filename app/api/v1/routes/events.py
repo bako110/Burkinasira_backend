@@ -57,9 +57,9 @@ async def update_event(
     data: UpdateEventRequest,
     current_user: TokenPayload = Depends(get_current_user),
 ):
-    """(Organisateur/Admin) Mettre à jour un événement."""
+    """(Organisateur/Admin/Moderateur) Mettre à jour un événement."""
     return await event_service.update_event(
-        event_id, data, current_user.sub, is_admin=current_user.role == UserRole.ADMIN
+        event_id, data, current_user.sub, is_admin=current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
     )
 
 

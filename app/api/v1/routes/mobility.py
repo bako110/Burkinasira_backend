@@ -24,6 +24,7 @@ async def list_providers(
     region: Optional[str] = None,
     province: Optional[str] = None,
     include_all_statuses: bool = False,
+    q: Optional[str] = Query(default=None, description="Recherche texte (nom, description, ville, véhicule)"),
     near_lat: Optional[float] = Query(default=None, description="Latitude pour recherche par proximité"),
     near_lng: Optional[float] = Query(default=None, description="Longitude pour recherche par proximité"),
     radius_km: Optional[float] = Query(default=None, gt=0, description="Rayon de recherche en km"),
@@ -34,7 +35,7 @@ async def list_providers(
     """Rechercher un trajet : taxis/VTC, chauffeurs privés, location, transferts aéroport (§11)."""
     is_admin = current_user is not None and current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
     return await mobility_service.list_providers(
-        type=type, region=region, province=province,
+        type=type, region=region, province=province, q=q,
         near_lat=near_lat, near_lng=near_lng, radius_km=radius_km,
         page=page, page_size=page_size,
         include_all_statuses=include_all_statuses and is_admin,
@@ -71,9 +72,9 @@ async def update_provider(
     data: UpdateTransportProviderRequest,
     current_user: TokenPayload = Depends(get_current_user),
 ):
-    """(Owner/Admin) Mettre à jour un prestataire de transport."""
+    """(Owner/Admin/Moderateur) Mettre à jour un prestataire de transport."""
     return await mobility_service.update_provider(
-        provider_id, data, current_user.sub, is_admin=current_user.role == UserRole.ADMIN
+        provider_id, data, current_user.sub, is_admin=current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
     )
 
 
