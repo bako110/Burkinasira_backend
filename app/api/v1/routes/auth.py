@@ -3,6 +3,7 @@ from app.core.security import get_current_user
 from app.schemas.auth import (
     RegisterRequest,
     LoginRequest,
+    GoogleLoginRequest,
     UpdateProfileRequest,
     ChangePasswordRequest,
     UserPublic,
@@ -25,6 +26,18 @@ async def register(data: RegisterRequest):
 async def login(data: LoginRequest):
     """Connexion par email et mot de passe."""
     return await user_service.login_user(data)
+
+
+@router.post("/google", response_model=TokenResponse)
+async def login_google(data: GoogleLoginRequest):
+    """Connexion / inscription via un `id_token` Google (Sign in with Google).
+
+    Le client (web ou app) obtient le `id_token` auprès de Google puis l'envoie
+    ici. Le serveur en vérifie la signature contre les clés publiques Google,
+    puis retrouve ou crée le compte et renvoie un access token BurkinaSira.
+    Renvoie 503 tant que `GOOGLE_CLIENT_IDS` n'est pas configuré.
+    """
+    return await user_service.login_with_google(data)
 
 
 @router.get("/me", response_model=UserPublic)

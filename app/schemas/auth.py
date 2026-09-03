@@ -38,6 +38,19 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class GoogleLoginRequest(BaseModel):
+    """`id_token` (JWT) renvoyé par Google Sign-In côté client (web ou natif)."""
+    id_token: str = Field(..., min_length=20)
+    role: UserRole = UserRole.TOURIST
+
+    @field_validator("role")
+    @classmethod
+    def restrict_self_signup_role(cls, v: UserRole) -> UserRole:
+        if v in (UserRole.ADMIN, UserRole.MODERATOR):
+            raise ValueError("Ce rôle ne peut pas être choisi à l'inscription")
+        return v
+
+
 class GuestSessionRequest(BaseModel):
     device_id: str
 

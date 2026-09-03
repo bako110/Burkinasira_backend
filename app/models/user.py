@@ -23,7 +23,11 @@ class User(BaseModel):
     full_name: str
     email: EmailStr
     phone: Optional[str] = None
-    hashed_password: str
+    # Optionnel : les comptes créés via "Connexion avec Google" n'ont pas de
+    # mot de passe local (auth_provider = "google", google_sub renseigné).
+    hashed_password: Optional[str] = None
+    auth_provider: str = "password"
+    google_sub: Optional[str] = None
     role: UserRole = UserRole.TOURIST
     status: UserStatus = UserStatus.ACTIVE
     is_verified: bool = False

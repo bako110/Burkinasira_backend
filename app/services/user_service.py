@@ -9,6 +9,7 @@ from app.models.user import UserRole, UserStatus
 from app.schemas.auth import (
     RegisterRequest,
     LoginRequest,
+    GoogleLoginRequest,
     UpdateProfileRequest,
     UserPublic,
     UserVerification,
@@ -18,6 +19,7 @@ from app.schemas.auth import (
 COLLECTION = "users"
 
 _card_token_index_ensured = False
+_google_sub_index_ensured = False
 
 
 async def _ensure_card_token_index(db) -> None:
@@ -26,6 +28,14 @@ async def _ensure_card_token_index(db) -> None:
         return
     await db[COLLECTION].create_index("card_token", unique=True, sparse=True)
     _card_token_index_ensured = True
+
+
+async def _ensure_google_sub_index(db) -> None:
+    global _google_sub_index_ensured
+    if _google_sub_index_ensured:
+        return
+    await db[COLLECTION].create_index("google_sub", unique=True, sparse=True)
+    _google_sub_index_ensured = True
 
 
 def _to_public(doc: dict) -> UserPublic:
@@ -108,7 +118,7 @@ async def register_user(data: RegisterRequest) -> TokenResponse:
 async def login_user(data: LoginRequest) -> TokenResponse:
     db = get_database()
     doc = await db[COLLECTION].find_one({"email": data.email.lower()})
-    if not doc or not verify_password(data.password, doc["hashed_password"]):
+    if not doc or not doc.get("hashed_password") or not verify_password(data.password, doc["hashed_password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou mot de passe incorrect",
@@ -122,6 +132,81 @@ async def login_user(data: LoginRequest) -> TokenResponse:
     await db[COLLECTION].update_one(
         {"_id": doc["_id"]}, {"$set": {"last_login_at": datetime.utcnow()}}
     )
+
+    token, expires_at = create_access_token(
+        user_id=str(doc["_id"]), email=doc["email"], role=UserRole(doc["role"])
+    )
+    return TokenResponse(access_token=token, expires_at=expires_at, user=_to_public(doc))
+
+
+async def login_with_google(data: GoogleLoginRequest) -> TokenResponse:
+    """Connexion / inscription via un `id_token` Google.
+
+    Ordre de résolution du compte :
+      1. compte déjà lié à ce `google_sub` ;
+      2. sinon, compte existant avec le même email (on le lie à Google) ;
+      3. sinon, création d'un nouveau compte sans mot de passe.
+    """
+    from app.services.google_auth_service import verify_google_id_token
+
+    claims = await verify_google_id_token(data.id_token)
+    google_sub = claims["sub"]
+    email = (claims.get("email") or "").lower()
+    email_verified = bool(claims.get("email_verified"))
+    full_name = claims.get("name") or (email.split("@")[0] if email else "Utilisateur Google")
+    avatar_url = claims.get("picture")
+
+    db = get_database()
+    await _ensure_google_sub_index(db)
+    now = datetime.utcnow()
+
+    doc = await db[COLLECTION].find_one({"google_sub": google_sub})
+
+    if not doc and email:
+        doc = await db[COLLECTION].find_one({"email": email})
+        if doc:
+            # On lie le compte email existant à Google.
+            await db[COLLECTION].update_one(
+                {"_id": doc["_id"]},
+                {"$set": {"google_sub": google_sub, "updated_at": now,
+                          **({"avatar_url": avatar_url} if avatar_url and not doc.get("avatar_url") else {})}},
+            )
+            doc["google_sub"] = google_sub
+
+    if not doc:
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Le compte Google ne fournit pas d'adresse email",
+            )
+        new_doc = {
+            "full_name": full_name,
+            "email": email,
+            "phone": None,
+            "hashed_password": None,
+            "google_sub": google_sub,
+            "auth_provider": "google",
+            "role": data.role.value,
+            "status": UserStatus.ACTIVE.value,
+            # Google a déjà vérifié l'email : on démarre le compte comme vérifié
+            # au sens "email confirmé" (la vérification de documents reste à part).
+            "is_verified": email_verified,
+            "avatar_url": avatar_url,
+            "preferred_language": "fr",
+            "created_at": now,
+            "updated_at": now,
+            "last_login_at": now,
+        }
+        result = await db[COLLECTION].insert_one(new_doc)
+        new_doc["_id"] = result.inserted_id
+        doc = new_doc
+    else:
+        if doc.get("status") != UserStatus.ACTIVE.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Ce compte est suspendu ou supprimé",
+            )
+        await db[COLLECTION].update_one({"_id": doc["_id"]}, {"$set": {"last_login_at": now}})
 
     token, expires_at = create_access_token(
         user_id=str(doc["_id"]), email=doc["email"], role=UserRole(doc["role"])
@@ -186,7 +271,14 @@ async def update_profile(user_id: str, data: UpdateProfileRequest) -> UserPublic
 async def change_password(user_id: str, current_password: str, new_password: str) -> None:
     db = get_database()
     doc = await db[COLLECTION].find_one({"_id": ObjectId(user_id)})
-    if not doc or not verify_password(current_password, doc["hashed_password"]):
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur introuvable")
+    if not doc.get("hashed_password"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ce compte utilise la connexion Google et n'a pas de mot de passe",
+        )
+    if not verify_password(current_password, doc["hashed_password"]):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Mot de passe actuel incorrect",

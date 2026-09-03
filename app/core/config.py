@@ -32,7 +32,19 @@ class Settings(BaseSettings):
     # répond avec un message clair indiquant qu'il n'est pas encore activé.
     ANTHROPIC_API_KEY: Optional[str] = None
     ANTHROPIC_MODEL: str = "claude-haiku-4-5-20251001"
-    
+
+    # Connexion Google (Sign in with Google) — optionnel : tant qu'aucun client ID
+    # n'est fourni, l'endpoint /auth/google renvoie 503. Liste séparée par des
+    # virgules : on met le Web client ID ET l'Android client ID (l'app native
+    # signe le id_token avec l'un ou l'autre selon la plateforme).
+    GOOGLE_CLIENT_IDS: Optional[str] = None
+
+    @property
+    def google_client_ids(self) -> list:
+        if not self.GOOGLE_CLIENT_IDS or not self.GOOGLE_CLIENT_IDS.strip():
+            return []
+        return [cid.strip() for cid in self.GOOGLE_CLIENT_IDS.split(",") if cid.strip()]
+
     @property
     def cors_origins(self) -> list:
         """Convertit ALLOWED_ORIGINS en liste. Si vide ou *, accepte toutes les origines"""
