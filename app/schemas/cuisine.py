@@ -59,6 +59,7 @@ class RestaurantSummary(BaseModel):
     region: str
     province: Optional[str] = None
     city: Optional[str] = None
+    location: Optional[GeoPoint] = None
     photo: Optional[str] = None
     dietary_tags: List[DietaryTag]
     average_rating: float

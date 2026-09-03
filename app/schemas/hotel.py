@@ -49,6 +49,7 @@ class HotelSummary(BaseModel):
     region: str
     province: Optional[str] = None
     city: Optional[str] = None
+    location: Optional[GeoPoint] = None
     photo: Optional[str] = None
     min_price: Optional[float] = None
     currency: str = "XOF"

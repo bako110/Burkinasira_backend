@@ -27,6 +27,7 @@ def _to_summary(doc: dict) -> RestaurantSummary:
         region=doc["region"],
         province=doc.get("province"),
         city=doc.get("city"),
+        location=doc.get("location"),
         photo=doc["photos"][0] if doc.get("photos") else None,
         dietary_tags=doc.get("dietary_tags", []),
         average_rating=doc.get("average_rating", 0.0),

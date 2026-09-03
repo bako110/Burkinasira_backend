@@ -29,6 +29,7 @@ def _provider_to_summary(doc: dict) -> TransportProviderSummary:
         region=doc["region"],
         province=doc.get("province"),
         city=doc.get("city"),
+        base_location=doc.get("base_location"),
         photo=doc["photos"][0] if doc.get("photos") else None,
         price_estimate=doc.get("price_estimate"),
         price_currency=doc.get("price_currency", "XOF"),

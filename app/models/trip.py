@@ -3,6 +3,8 @@ from datetime import date, datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field
 
+from app.models.destination import GeoPoint
+
 
 class TripThemeType(str, Enum):
     BUDGET = "budget"
@@ -42,6 +44,7 @@ class TripDayItem(BaseModel):
     title: str
     notes: Optional[str] = None
     estimated_cost: Optional[float] = None
+    location: Optional[GeoPoint] = None  # copiée depuis la fiche liée, pour estimer le transport réel entre étapes
 
 
 class TripDay(BaseModel):

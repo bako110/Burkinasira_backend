@@ -31,6 +31,7 @@ def _to_summary(doc: dict) -> HotelSummary:
         region=doc["region"],
         province=doc.get("province"),
         city=doc.get("city"),
+        location=doc.get("location"),
         photo=doc["photos"][0] if doc.get("photos") else None,
         min_price=min(prices) if prices else None,
         currency=doc.get("room_types", [{}])[0].get("currency", "XOF") if doc.get("room_types") else "XOF",

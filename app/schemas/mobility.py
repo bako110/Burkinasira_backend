@@ -44,6 +44,7 @@ class TransportProviderSummary(BaseModel):
     region: str
     province: Optional[str] = None
     city: Optional[str] = None
+    base_location: Optional[GeoPoint] = None
     photo: Optional[str] = None
     price_estimate: Optional[float] = None
     price_currency: str
