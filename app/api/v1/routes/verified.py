@@ -37,7 +37,7 @@ async def list_my_verifications(current_user: TokenPayload = Depends(get_current
 
 
 @router.get("/verification-requests", response_model=list)
-async def list_pending_verifications(current_user: TokenPayload = Depends(require_role(UserRole.ADMIN))):
+async def list_pending_verifications(current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR))):
     """(Admin) Demandes de vérification en attente."""
     return await verified_service.list_pending_verifications()
 

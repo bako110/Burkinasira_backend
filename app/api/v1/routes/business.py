@@ -37,9 +37,9 @@ async def list_my_quote_requests(current_user: TokenPayload = Depends(get_curren
 @router.get("/quotes", response_model=list)
 async def list_all_quote_requests(
     status_filter: Optional[QuoteRequestStatus] = None,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.PROVIDER)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR, UserRole.PROVIDER)),
 ):
-    """(Admin/Provider) Toutes les demandes de devis."""
+    """(Admin/Moderateur/Provider) Toutes les demandes de devis."""
     return await business_service.list_all_quote_requests(status_filter)
 
 
@@ -53,9 +53,9 @@ async def get_quote_request(quote_id: str, current_user: TokenPayload = Depends(
 async def update_quote_request(
     quote_id: str,
     data: UpdateQuoteRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.PROVIDER)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR, UserRole.PROVIDER)),
 ):
-    """(Admin/Provider) Répondre à une demande de devis (montant, statut)."""
+    """(Admin/Moderateur/Provider) Répondre à une demande de devis (montant, statut)."""
     return await business_service.update_quote_request(quote_id, data)
 
 
@@ -84,9 +84,9 @@ async def remove_participant(participant_id: str, current_user: TokenPayload = D
 @router.post("/invoices", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED)
 async def create_invoice(
     data: CreateInvoiceRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.PROVIDER)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR, UserRole.PROVIDER)),
 ):
-    """(Admin/Provider) Émettre une facture entreprise pour une demande de devis."""
+    """(Admin/Moderateur/Provider) Émettre une facture entreprise pour une demande de devis."""
     return await business_service.create_invoice(data)
 
 
@@ -100,7 +100,7 @@ async def list_invoices_for_quote(quote_id: str, current_user: TokenPayload = De
 async def update_invoice_status(
     invoice_id: str,
     data: UpdateInvoiceStatusRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.PROVIDER)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR, UserRole.PROVIDER)),
 ):
-    """(Admin/Provider) Mettre à jour le statut d'une facture."""
+    """(Admin/Moderateur/Provider) Mettre à jour le statut d'une facture."""
     return await business_service.update_invoice_status(invoice_id, data)

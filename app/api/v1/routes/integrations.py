@@ -16,7 +16,7 @@ router = APIRouter(prefix="/integrations", tags=["API et intégrations"])
 
 
 @router.get("/connectors", response_model=list)
-async def list_connectors(current_user: TokenPayload = Depends(require_role(UserRole.ADMIN))):
+async def list_connectors(current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR))):
     """Connecteurs disponibles : cartographie, météo, paiement, notifications, SMS/WhatsApp, billetterie... (§46)."""
     return await integration_service.list_connectors()
 
@@ -25,16 +25,16 @@ async def list_connectors(current_user: TokenPayload = Depends(require_role(User
 async def upsert_connector(
     connector_type: ConnectorType,
     data: UpdateConnectorRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
 ):
-    """(Admin) Configurer un connecteur."""
+    """(Admin/Moderateur) Configurer un connecteur."""
     return await integration_service.upsert_connector(connector_type, data, actor_id=current_user.sub)
 
 
 @router.post("/webhooks", response_model=WebhookResponse, status_code=status.HTTP_201_CREATED)
 async def create_webhook(
     data: CreateWebhookRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.PROVIDER)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR, UserRole.PROVIDER)),
 ):
     """Créer un webhook pour les réservations et paiements."""
     return await integration_service.create_webhook(data, owner_id=current_user.sub)
@@ -42,7 +42,7 @@ async def create_webhook(
 
 @router.get("/webhooks", response_model=list)
 async def list_my_webhooks(
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.PROVIDER)),
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR, UserRole.PROVIDER)),
 ):
     """Ses webhooks configurés."""
     return await integration_service.list_my_webhooks(current_user.sub)
