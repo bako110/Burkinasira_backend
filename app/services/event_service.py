@@ -38,7 +38,7 @@ def _to_summary(doc: dict) -> EventSummary:
 def _to_detail(doc: dict) -> EventDetail:
     return EventDetail(
         id=str(doc["_id"]),
-        organizer_id=doc["organizer_id"],
+        organizer_id=doc.get("organizer_id", "burkinasira-editorial"),
         title=doc["title"],
         slug=doc["slug"],
         description=doc["description"],
@@ -142,7 +142,7 @@ async def update_event(event_id: str, data: UpdateEventRequest, current_user_id:
     doc = await db[COLLECTION].find_one({"_id": ObjectId(event_id)})
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Événement introuvable")
-    if doc["organizer_id"] != current_user_id and not is_admin:
+    if doc.get("organizer_id") != current_user_id and not is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez modifier que vos propres événements")
 
     update_fields = data.model_dump(exclude_unset=True, exclude_none=True)
@@ -160,6 +160,6 @@ async def delete_event(event_id: str, current_user_id: str, is_admin: bool) -> N
     doc = await db[COLLECTION].find_one({"_id": ObjectId(event_id)})
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Événement introuvable")
-    if doc["organizer_id"] != current_user_id and not is_admin:
+    if doc.get("organizer_id") != current_user_id and not is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez supprimer que vos propres événements")
     await db[COLLECTION].delete_one({"_id": ObjectId(event_id)})
