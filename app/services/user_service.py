@@ -188,12 +188,14 @@ async def login_with_google(data: GoogleLoginRequest) -> TokenResponse:
             "hashed_password": None,
             "google_sub": google_sub,
             "auth_provider": "google",
+            "email_verified": email_verified,  # email confirmé par Google
             "role": data.role.value,
             "role_chosen": data.role != UserRole.TOURIST,
             "status": UserStatus.ACTIVE.value,
-            # Google a déjà vérifié l'email : on démarre le compte comme vérifié
-            # au sens "email confirmé" (la vérification de documents reste à part).
-            "is_verified": email_verified,
+            # Comme à l'inscription classique : is_verified concerne la
+            # vérification de documents (guides/prestataires) et reste False.
+            # Un compte Google guide/prestataire passe donc bien par /pro/pending.
+            "is_verified": False,
             "avatar_url": avatar_url,
             "preferred_language": "fr",
             "created_at": now,
