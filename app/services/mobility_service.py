@@ -88,6 +88,7 @@ async def list_providers(
     region: Optional[str] = None,
     province: Optional[str] = None,
     include_all_statuses: bool = False,
+    q: Optional[str] = None,
     near_lat: Optional[float] = None,
     near_lng: Optional[float] = None,
     radius_km: Optional[float] = None,
@@ -102,6 +103,13 @@ async def list_providers(
         query["region"] = region
     if province:
         query["province"] = province
+    if q:
+        query["$or"] = [
+            {"name": {"$regex": q, "$options": "i"}},
+            {"description": {"$regex": q, "$options": "i"}},
+            {"city": {"$regex": q, "$options": "i"}},
+            {"vehicle_info": {"$regex": q, "$options": "i"}},
+        ]
 
     if near_lat is not None and near_lng is not None:
         all_docs = await db[PROVIDERS_COLLECTION].find(query).to_list(length=None)

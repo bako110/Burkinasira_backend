@@ -24,6 +24,7 @@ async def list_money_services(
     type: Optional[MoneyServiceType] = None,
     region: Optional[str] = None,
     province: Optional[str] = None,
+    q: Optional[str] = Query(default=None, description="Recherche texte (nom, ville, adresse)"),
     near_lat: Optional[float] = None,
     near_lng: Optional[float] = None,
     radius_km: Optional[float] = None,
@@ -32,7 +33,7 @@ async def list_money_services(
 ):
     """Banques, distributeurs, Mobile Money, bureaux de change par proximité (§13)."""
     return await finance_service.list_money_services(
-        type=type, region=region, province=province, near_lat=near_lat, near_lng=near_lng,
+        type=type, region=region, province=province, q=q, near_lat=near_lat, near_lng=near_lng,
         radius_km=radius_km, page=page, page_size=page_size,
     )
 

@@ -81,6 +81,7 @@ async def list_points(
     type: Optional[ConnectivityPointType] = None,
     region: Optional[str] = None,
     province: Optional[str] = None,
+    q: Optional[str] = None,
     near_lat: Optional[float] = None,
     near_lng: Optional[float] = None,
     radius_km: Optional[float] = None,
@@ -95,6 +96,13 @@ async def list_points(
         query["region"] = region
     if province:
         query["province"] = province
+    if q:
+        query["$or"] = [
+            {"name": {"$regex": q, "$options": "i"}},
+            {"operator": {"$regex": q, "$options": "i"}},
+            {"city": {"$regex": q, "$options": "i"}},
+            {"address": {"$regex": q, "$options": "i"}},
+        ]
 
     all_docs = await db[COLLECTION].find(query).to_list(length=None)
 

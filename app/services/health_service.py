@@ -84,6 +84,7 @@ async def list_health_facilities(
     region: Optional[str] = None,
     province: Optional[str] = None,
     on_duty_only: bool = False,
+    q: Optional[str] = None,
     near_lat: Optional[float] = None,
     near_lng: Optional[float] = None,
     radius_km: Optional[float] = None,
@@ -101,6 +102,13 @@ async def list_health_facilities(
         query["province"] = province
     if on_duty_only:
         query["is_on_duty"] = True
+    if q:
+        query["$or"] = [
+            {"name": {"$regex": q, "$options": "i"}},
+            {"description": {"$regex": q, "$options": "i"}},
+            {"city": {"$regex": q, "$options": "i"}},
+            {"address": {"$regex": q, "$options": "i"}},
+        ]
 
     all_docs = await db[COLLECTION].find(query).to_list(length=None)
 
