@@ -21,11 +21,12 @@ router = APIRouter(prefix="/family-services", tags=["Famille, enfants et service
 async def list_family_services(
     type: Optional[FamilyServiceType] = None,
     region: Optional[str] = None,
+    q: Optional[str] = Query(default=None, description="Recherche texte sur le nom"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ):
     """Filtrer les lieux/services adaptés aux familles (§22)."""
-    return await family_service.list_family_services(type=type, region=region, page=page, page_size=page_size)
+    return await family_service.list_family_services(type=type, region=region, q=q, page=page, page_size=page_size)
 
 
 @router.get("/childcare-bookings/me", response_model=list)

@@ -66,6 +66,7 @@ async def create_family_service(data: CreateFamilyServiceRequest) -> FamilyServi
 async def list_family_services(
     type: Optional[FamilyServiceType] = None,
     region: Optional[str] = None,
+    q: Optional[str] = None,
     page: int = 1,
     page_size: int = 20,
 ) -> FamilyServiceListResponse:
@@ -75,6 +76,8 @@ async def list_family_services(
         query["type"] = type.value if isinstance(type, FamilyServiceType) else type
     if region:
         query["region"] = region
+    if q:
+        query["name"] = {"$regex": q, "$options": "i"}
 
     total = await db[COLLECTION].count_documents(query)
     skip = (page - 1) * page_size

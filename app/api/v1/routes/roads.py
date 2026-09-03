@@ -22,6 +22,7 @@ router = APIRouter(prefix="/roads", tags=["Services automobiles et routiers"])
 async def list_road_services(
     type: Optional[RoadServiceType] = None,
     region: Optional[str] = None,
+    q: Optional[str] = Query(default=None, description="Recherche texte sur le nom"),
     near_lat: Optional[float] = None,
     near_lng: Optional[float] = None,
     radius_km: Optional[float] = None,
@@ -30,7 +31,7 @@ async def list_road_services(
 ):
     """Stations-service, garages, mécaniciens, dépannage... le plus proche (§12)."""
     return await roads_service.list_road_services(
-        type=type, region=region, near_lat=near_lat, near_lng=near_lng,
+        type=type, region=region, q=q, near_lat=near_lat, near_lng=near_lng,
         radius_km=radius_km, page=page, page_size=page_size,
     )
 

@@ -75,6 +75,7 @@ async def create_road_service(data: CreateRoadServiceRequest) -> RoadServiceDeta
 async def list_road_services(
     type: Optional[RoadServiceType] = None,
     region: Optional[str] = None,
+    q: Optional[str] = None,
     near_lat: Optional[float] = None,
     near_lng: Optional[float] = None,
     radius_km: Optional[float] = None,
@@ -87,6 +88,8 @@ async def list_road_services(
         query["type"] = type.value if isinstance(type, RoadServiceType) else type
     if region:
         query["region"] = region
+    if q:
+        query["name"] = {"$regex": q, "$options": "i"}
 
     all_docs = await db[COLLECTION].find(query).to_list(length=None)
 

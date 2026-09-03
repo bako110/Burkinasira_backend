@@ -55,6 +55,7 @@ async def create_outing(data: CreateOutingRequest, organizer_id: str) -> OutingR
 async def list_outings(
     type: Optional[EduOutingType] = None,
     region: Optional[str] = None,
+    q: Optional[str] = None,
     page: int = 1,
     page_size: int = 20,
 ) -> dict:
@@ -64,6 +65,8 @@ async def list_outings(
         query["type"] = type.value if isinstance(type, EduOutingType) else type
     if region:
         query["region"] = region
+    if q:
+        query["title"] = {"$regex": q, "$options": "i"}
 
     total = await db[OUTINGS_COLLECTION].count_documents(query)
     skip = (page - 1) * page_size

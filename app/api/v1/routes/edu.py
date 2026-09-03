@@ -22,11 +22,12 @@ router = APIRouter(prefix="/edu", tags=["Tourisme éducatif — BurkinaSira Edu"
 async def list_outings(
     type: Optional[EduOutingType] = None,
     region: Optional[str] = None,
+    q: Optional[str] = Query(default=None, description="Recherche texte sur le titre"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ):
     """Sorties scolaires, visites historiques/culturelles/scientifiques/agricoles/industrielles (§30)."""
-    return await edu_service.list_outings(type=type, region=region, page=page, page_size=page_size)
+    return await edu_service.list_outings(type=type, region=region, q=q, page=page, page_size=page_size)
 
 
 @router.get("/outings/{outing_id}", response_model=OutingResponse)
