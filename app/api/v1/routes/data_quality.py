@@ -34,6 +34,35 @@ async def list_error_reports(
     return await data_quality_service.list_error_reports(status_filter)
 
 
+@router.get("/error-reports/received", response_model=list)
+async def list_received_error_reports(
+    status_filter: Optional[DataErrorReportStatus] = None,
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.GUIDE, UserRole.ADMIN, UserRole.MODERATOR)),
+):
+    """(Prestataire) Signalements portant sur MES fiches — hôtels, restaurants,
+    transport, profil guide, événements, expériences dont je suis le propriétaire."""
+    return await data_quality_service.list_reports_for_owner(current_user.sub, status_filter)
+
+
+@router.get("/error-reports/received/count", response_model=int)
+async def count_open_received_error_reports(
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.GUIDE, UserRole.ADMIN, UserRole.MODERATOR)),
+):
+    """(Prestataire) Nombre de signalements non traités sur mes fiches (pastille)."""
+    return await data_quality_service.count_open_reports_for_owner(current_user.sub)
+
+
+@router.patch("/error-reports/received/{report_id}", response_model=DataErrorReportResponse)
+async def moderate_received_error_report(
+    report_id: str,
+    data: ModerateDataErrorRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.GUIDE, UserRole.ADMIN, UserRole.MODERATOR)),
+):
+    """(Prestataire) Traiter un signalement sur l'une de mes fiches
+    (en cours d'examen / corrigé / rejeté)."""
+    return await data_quality_service.moderate_error_report_as_owner(report_id, data, current_user.sub)
+
+
 @router.patch("/error-reports/{report_id}", response_model=DataErrorReportResponse)
 async def moderate_error_report(
     report_id: str,

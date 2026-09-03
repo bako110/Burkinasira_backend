@@ -65,6 +65,68 @@ async def list_error_reports(status_filter: Optional[DataErrorReportStatus] = No
     return [_report_to_response(d) for d in docs]
 
 
+async def list_reports_for_owner(
+    owner_id: str, status_filter: Optional[DataErrorReportStatus] = None
+) -> list:
+    """Signalements portant sur des fiches dont `owner_id` est le propriétaire
+    (ou un gérant d'équipe rattaché). Sert l'espace pro : chaque prestataire ne
+    voit que les signalements de ses propres établissements."""
+    from app.services.booking_provider_resolver import is_authorized_for_establishment
+
+    db = get_database()
+    query: dict = {}
+    if status_filter:
+        query["status"] = status_filter.value if isinstance(status_filter, DataErrorReportStatus) else status_filter
+    docs = await db[ERROR_REPORTS_COLLECTION].find(query).sort("created_at", -1).to_list(length=None)
+
+    owned = []
+    for d in docs:
+        if await is_authorized_for_establishment(d["item_type"], d["item_id"], owner_id):
+            owned.append(d)
+    return [_report_to_response(d) for d in owned]
+
+
+async def count_open_reports_for_owner(owner_id: str) -> int:
+    """Nombre de signalements non traités (reported / reviewing) sur les fiches
+    du prestataire — pour la pastille de notification de l'espace pro."""
+    from app.services.booking_provider_resolver import is_authorized_for_establishment
+
+    db = get_database()
+    open_statuses = [DataErrorReportStatus.REPORTED.value, DataErrorReportStatus.REVIEWING.value]
+    docs = await db[ERROR_REPORTS_COLLECTION].find({"status": {"$in": open_statuses}}).to_list(length=None)
+    count = 0
+    for d in docs:
+        if await is_authorized_for_establishment(d["item_type"], d["item_id"], owner_id):
+            count += 1
+    return count
+
+
+async def moderate_error_report_as_owner(
+    report_id: str, data: ModerateDataErrorRequest, owner_id: str
+) -> DataErrorReportResponse:
+    """Comme `moderate_error_report`, mais réservé au propriétaire de la fiche
+    concernée (vérification d'autorisation sur l'établissement au lieu du rôle)."""
+    from app.services.booking_provider_resolver import is_authorized_for_establishment
+
+    db = get_database()
+    if not ObjectId.is_valid(report_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signalement introuvable")
+    doc = await db[ERROR_REPORTS_COLLECTION].find_one({"_id": ObjectId(report_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signalement introuvable")
+    if not await is_authorized_for_establishment(doc["item_type"], doc["item_id"], owner_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Ce signalement ne concerne pas l'une de vos fiches",
+        )
+    await db[ERROR_REPORTS_COLLECTION].update_one(
+        {"_id": ObjectId(report_id)},
+        {"$set": {"status": data.status.value, "reviewed_by": owner_id}},
+    )
+    doc = await db[ERROR_REPORTS_COLLECTION].find_one({"_id": ObjectId(report_id)})
+    return _report_to_response(doc)
+
+
 async def moderate_error_report(report_id: str, data: ModerateDataErrorRequest, reviewer_id: str) -> DataErrorReportResponse:
     db = get_database()
     if not ObjectId.is_valid(report_id):
