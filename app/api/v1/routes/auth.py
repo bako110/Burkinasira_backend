@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, status
 from app.core.security import get_current_user
 from app.schemas.auth import (
     RegisterRequest,
     LoginRequest,
     GoogleLoginRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
     UpdateProfileRequest,
     ChangePasswordRequest,
     UserPublic,
@@ -17,15 +19,34 @@ router = APIRouter(prefix="/auth", tags=["Authentification"])
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(data: RegisterRequest):
-    """Créer un compte (touriste, guide ou prestataire)."""
-    return await user_service.register_user(data)
+async def register(data: RegisterRequest, background_tasks: BackgroundTasks):
+    """Créer un compte (touriste, guide ou prestataire).
+
+    Un email de bienvenue est envoyé en arrière-plan ; son échec éventuel
+    n'empêche pas la création du compte."""
+    return await user_service.register_user(data, background_tasks)
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login(data: LoginRequest):
     """Connexion par email et mot de passe."""
     return await user_service.login_user(data)
+
+
+@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
+async def forgot_password(data: ForgotPasswordRequest, background_tasks: BackgroundTasks):
+    """Demander un lien de réinitialisation de mot de passe par email.
+
+    Renvoie toujours 202, que l'email existe ou non (pas d'énumération de comptes).
+    """
+    await user_service.request_password_reset(data.email, background_tasks)
+    return {"message": "Si un compte existe pour cette adresse, un email a été envoyé."}
+
+
+@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+async def reset_password(data: ResetPasswordRequest):
+    """Définir un nouveau mot de passe à partir du token reçu par email."""
+    await user_service.reset_password(data.token, data.new_password)
 
 
 @router.post("/google", response_model=TokenResponse)

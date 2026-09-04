@@ -1,9 +1,12 @@
+import hashlib
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from bson import ObjectId
-from fastapi import HTTPException, status
+from fastapi import BackgroundTasks, HTTPException, status
+from app.core.config import settings
 from app.core.database import get_database
+from app.core.email import send_welcome_email, send_password_reset_email
 from app.core.security import hash_password, verify_password, create_access_token
 from app.models.user import UserRole, UserStatus
 from app.schemas.auth import (
@@ -82,7 +85,7 @@ async def create_managed_user(email: str, password: str, full_name: str, role: U
     return _to_public(doc)
 
 
-async def register_user(data: RegisterRequest) -> TokenResponse:
+async def register_user(data: RegisterRequest, background_tasks: Optional[BackgroundTasks] = None) -> TokenResponse:
     db = get_database()
     existing = await db[COLLECTION].find_one({"email": data.email.lower()})
     if existing:
@@ -109,10 +112,85 @@ async def register_user(data: RegisterRequest) -> TokenResponse:
     result = await db[COLLECTION].insert_one(doc)
     doc["_id"] = result.inserted_id
 
+    # Email de bienvenue en arrière-plan : son échec n'affecte pas l'inscription.
+    if background_tasks is not None:
+        background_tasks.add_task(send_welcome_email, doc["email"], doc["full_name"])
+
     token, expires_at = create_access_token(
         user_id=str(doc["_id"]), email=doc["email"], role=data.role
     )
     return TokenResponse(access_token=token, expires_at=expires_at, user=_to_public(doc))
+
+
+# --- Réinitialisation de mot de passe ---
+
+_RESET_TOKEN_TTL = timedelta(hours=1)
+_reset_index_ensured = False
+
+
+async def _ensure_reset_index(db) -> None:
+    global _reset_index_ensured
+    if _reset_index_ensured:
+        return
+    await db["password_reset_tokens"].create_index("token_hash", unique=True)
+    await db["password_reset_tokens"].create_index("expires_at", expireAfterSeconds=0)
+    _reset_index_ensured = True
+
+
+def _hash_reset_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+async def request_password_reset(email: str, background_tasks: Optional[BackgroundTasks] = None) -> None:
+    """Génère un token de reset et envoie l'email. Ne révèle jamais si l'email
+    existe : la fonction retourne silencieusement dans tous les cas."""
+    db = get_database()
+    await _ensure_reset_index(db)
+
+    doc = await db[COLLECTION].find_one({"email": (email or "").lower()})
+    # Comptes Google-only (sans mot de passe) : pas de reset par email.
+    if not doc or not doc.get("hashed_password"):
+        return
+    if doc.get("status") != UserStatus.ACTIVE.value:
+        return
+
+    raw_token = secrets.token_urlsafe(32)
+    now = datetime.utcnow()
+    await db["password_reset_tokens"].delete_many({"user_id": str(doc["_id"])})
+    await db["password_reset_tokens"].insert_one({
+        "user_id": str(doc["_id"]),
+        "token_hash": _hash_reset_token(raw_token),
+        "created_at": now,
+        "expires_at": now + _RESET_TOKEN_TTL,
+        "used_at": None,
+    })
+
+    reset_url = f"{settings.PUBLIC_WEB_URL.rstrip('/')}/reset-password?token={raw_token}"
+    if background_tasks is not None:
+        background_tasks.add_task(send_password_reset_email, doc["email"], doc["full_name"], reset_url)
+    else:
+        await send_password_reset_email(doc["email"], doc["full_name"], reset_url)
+
+
+async def reset_password(raw_token: str, new_password: str) -> None:
+    db = get_database()
+    await _ensure_reset_index(db)
+
+    entry = await db["password_reset_tokens"].find_one({"token_hash": _hash_reset_token(raw_token)})
+    if not entry or entry.get("used_at") is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lien invalide ou déjà utilisé")
+    if entry["expires_at"] < datetime.utcnow():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lien expiré, refaites une demande")
+
+    if not ObjectId.is_valid(entry["user_id"]):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lien invalide")
+
+    now = datetime.utcnow()
+    await db[COLLECTION].update_one(
+        {"_id": ObjectId(entry["user_id"])},
+        {"$set": {"hashed_password": hash_password(new_password), "updated_at": now}},
+    )
+    await db["password_reset_tokens"].update_one({"_id": entry["_id"]}, {"$set": {"used_at": now}})
 
 
 async def login_user(data: LoginRequest) -> TokenResponse:

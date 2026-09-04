@@ -28,6 +28,24 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads"
     PUBLIC_BASE_URL: str = "http://localhost:8000"
 
+    # URL publique du site web (front) — sert à construire les liens des emails
+    # (ex: réinitialisation de mot de passe).
+    PUBLIC_WEB_URL: str = "https://burkinasira.com"
+
+    # Envoi d'emails (SMTP). Tant que SMTP_HOST est vide, aucun email n'est
+    # envoyé (l'inscription et le "mot de passe oublié" fonctionnent quand même,
+    # l'échec est simplement journalisé).
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_FROM: Optional[str] = None  # ex: "BurkinaSira <no-reply@burkinasira.com>"
+    SMTP_USE_TLS: bool = True  # STARTTLS sur le port 587 ; False + port 465 = SSL direct
+
+    @property
+    def email_enabled(self) -> bool:
+        return bool(self.SMTP_HOST and self.SMTP_FROM)
+
     # Assistant IA — optionnel : tant qu'aucune clé n'est fournie, l'assistant
     # répond avec un message clair indiquant qu'il n'est pas encore activé.
     ANTHROPIC_API_KEY: Optional[str] = None
