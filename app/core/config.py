@@ -32,19 +32,25 @@ class Settings(BaseSettings):
     # (ex: réinitialisation de mot de passe).
     PUBLIC_WEB_URL: str = "https://burkinasira.com"
 
-    # Envoi d'emails (SMTP). Tant que SMTP_HOST est vide, aucun email n'est
+    # Envoi d'emails (SMTP). Tant que EMAIL_HOST est vide, aucun email n'est
     # envoyé (l'inscription et le "mot de passe oublié" fonctionnent quand même,
     # l'échec est simplement journalisé).
-    SMTP_HOST: Optional[str] = None
-    SMTP_PORT: int = 587
-    SMTP_USER: Optional[str] = None
-    SMTP_PASSWORD: Optional[str] = None
-    SMTP_FROM: Optional[str] = None  # ex: "BurkinaSira <no-reply@burkinasira.com>"
-    SMTP_USE_TLS: bool = True  # STARTTLS sur le port 587 ; False + port 465 = SSL direct
+    EMAIL_HOST: Optional[str] = None
+    EMAIL_PORT: int = 587
+    EMAIL_USER: Optional[str] = None
+    EMAIL_PASS: Optional[str] = None
+    # Adresse d'expéditeur. Par défaut on réutilise EMAIL_USER (utile avec Gmail
+    # qui exige que le From soit l'adresse authentifiée).
+    EMAIL_FROM: Optional[str] = None
+    EMAIL_USE_TLS: bool = True  # STARTTLS sur le port 587 ; False + port 465 = SSL direct
+
+    @property
+    def email_from_addr(self) -> Optional[str]:
+        return self.EMAIL_FROM or self.EMAIL_USER
 
     @property
     def email_enabled(self) -> bool:
-        return bool(self.SMTP_HOST and self.SMTP_FROM)
+        return bool(self.EMAIL_HOST and self.email_from_addr)
 
     # Assistant IA — optionnel : tant qu'aucune clé n'est fournie, l'assistant
     # répond avec un message clair indiquant qu'il n'est pas encore activé.

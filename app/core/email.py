@@ -25,7 +25,7 @@ async def send_email(to: str, subject: str, html_body: str, text_body: str | Non
         return False
 
     msg = EmailMessage()
-    msg["From"] = settings.SMTP_FROM
+    msg["From"] = settings.email_from_addr
     msg["To"] = to
     msg["Subject"] = subject
     msg.set_content(text_body or _strip_html(html_body))
@@ -34,12 +34,12 @@ async def send_email(to: str, subject: str, html_body: str, text_body: str | Non
     try:
         await aiosmtplib.send(
             msg,
-            hostname=settings.SMTP_HOST,
-            port=settings.SMTP_PORT,
-            username=settings.SMTP_USER or None,
-            password=settings.SMTP_PASSWORD or None,
-            start_tls=settings.SMTP_USE_TLS,
-            use_tls=not settings.SMTP_USE_TLS and settings.SMTP_PORT == 465,
+            hostname=settings.EMAIL_HOST,
+            port=settings.EMAIL_PORT,
+            username=settings.EMAIL_USER or None,
+            password=settings.EMAIL_PASS or None,
+            start_tls=settings.EMAIL_USE_TLS,
+            use_tls=not settings.EMAIL_USE_TLS and settings.EMAIL_PORT == 465,
             timeout=20,
         )
         logger.info("Email envoyé — to=%s subject=%r", to, subject)
