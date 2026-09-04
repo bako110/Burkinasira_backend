@@ -9,6 +9,7 @@ class ConversationKind(str, Enum):
     TOURISTE_HOTEL = "touriste_hotel"
     TOURISTE_RESTAURANT = "touriste_restaurant"
     TOURISTE_ARTISAN = "touriste_artisan"
+    TOURISTE_TRANSPORT = "touriste_transport"
     ENTREPRISE_PRESTATAIRE = "entreprise_prestataire"
     SUPPORT_CLIENT = "support_client"
     GROUPE_VOYAGEURS = "groupe_voyageurs"
