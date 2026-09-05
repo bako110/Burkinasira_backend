@@ -81,6 +81,25 @@ class Product(BaseModel):
         use_enum_values = True
 
 
+class DeliveryAgency(BaseModel):
+    """Agence de livraison à qui sont confiées les commandes artisanales (§19)."""
+    id: Optional[str] = Field(default=None, alias="_id")
+    name: str
+    contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
+    covered_regions: List[str] = []  # régions desservies ; vide = toutes
+    # Compte utilisateur (facultatif) autorisé à consulter les commandes de
+    # l'agence et à faire avancer leur statut de livraison.
+    manager_user_id: Optional[str] = None
+    active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        populate_by_name = True
+        use_enum_values = True
+
+
 class DeliveryFeeRule(BaseModel):
     """Grille des frais de livraison des produits artisanaux (§19).
 
@@ -92,7 +111,8 @@ class DeliveryFeeRule(BaseModel):
     region: str  # région de destination ; "*" = tarif par défaut
     fee: float = Field(..., ge=0)  # frais fixes pour cette région
     currency: str = "XOF"
-    delivery_provider: Optional[str] = None  # agence de livraison assignée
+    agency_id: Optional[str] = None  # agence de livraison assignée à cette région
+    delivery_provider: Optional[str] = None  # libellé dénormalisé (nom de l'agence)
     free_delivery_threshold: Optional[float] = Field(default=None, ge=0)
     eta_days_min: Optional[int] = Field(default=None, ge=0)
     eta_days_max: Optional[int] = Field(default=None, ge=0)
@@ -103,3 +123,54 @@ class DeliveryFeeRule(BaseModel):
     class Config:
         populate_by_name = True
         use_enum_values = True
+
+
+class ArtisanOrderStatus(str, Enum):
+    """Cycle de vie d'une commande artisanale."""
+    PENDING = "pending"                # créée, paiement/confirmation en attente
+    CONFIRMED = "confirmed"            # confirmée par l'artisan / la plateforme
+    HANDED_TO_AGENCY = "handed_to_agency"  # colis remis à l'agence de livraison
+    IN_DELIVERY = "in_delivery"        # en cours de livraison
+    DELIVERED = "delivered"            # livrée au client
+    CANCELLED = "cancelled"            # annulée (stock réapprovisionné)
+    RETURNED = "returned"              # retour after livraison (stock réapprovisionné)
+
+
+# Transitions autorisées du statut de commande.
+ARTISAN_ORDER_TRANSITIONS: dict = {
+    ArtisanOrderStatus.PENDING.value: {
+        ArtisanOrderStatus.CONFIRMED.value,
+        ArtisanOrderStatus.CANCELLED.value,
+    },
+    ArtisanOrderStatus.CONFIRMED.value: {
+        ArtisanOrderStatus.HANDED_TO_AGENCY.value,
+        ArtisanOrderStatus.DELIVERED.value,  # retrait en main propre / livraison directe
+        ArtisanOrderStatus.CANCELLED.value,
+    },
+    ArtisanOrderStatus.HANDED_TO_AGENCY.value: {
+        ArtisanOrderStatus.IN_DELIVERY.value,
+        ArtisanOrderStatus.CANCELLED.value,
+    },
+    ArtisanOrderStatus.IN_DELIVERY.value: {
+        ArtisanOrderStatus.DELIVERED.value,
+        ArtisanOrderStatus.RETURNED.value,
+    },
+    ArtisanOrderStatus.DELIVERED.value: {
+        ArtisanOrderStatus.RETURNED.value,
+    },
+    ArtisanOrderStatus.CANCELLED.value: set(),
+    ArtisanOrderStatus.RETURNED.value: set(),
+}
+
+# Statuts qui restituent le stock (une seule fois).
+ARTISAN_ORDER_STOCK_RESTORING = {
+    ArtisanOrderStatus.CANCELLED.value,
+    ArtisanOrderStatus.RETURNED.value,
+}
+
+
+class DeliverySettlementStatus(str, Enum):
+    """État du règlement des frais de livraison à l'agence."""
+    PENDING = "pending"    # dû à l'agence, non réglé
+    SETTLED = "settled"    # réglé
+    NOT_APPLICABLE = "not_applicable"  # commande en retrait, aucun frais

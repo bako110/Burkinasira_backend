@@ -13,6 +13,7 @@ from pymongo import ReturnDocument
 from fastapi import HTTPException, status
 
 from app.core.database import get_database
+from app.services import delivery_agency_service
 from app.schemas.artisan import (
     UpsertDeliveryFeeRuleRequest,
     DeliveryFeeRuleResponse,
@@ -33,6 +34,7 @@ def _rule_to_response(doc: dict) -> DeliveryFeeRuleResponse:
         region=doc["region"],
         fee=doc["fee"],
         currency=doc.get("currency", "XOF"),
+        agency_id=doc.get("agency_id"),
         delivery_provider=doc.get("delivery_provider"),
         free_delivery_threshold=doc.get("free_delivery_threshold"),
         eta_days_min=doc.get("eta_days_min"),
@@ -51,6 +53,12 @@ async def upsert_rule(data: UpsertDeliveryFeeRuleRequest) -> DeliveryFeeRuleResp
     doc["region"] = region
     doc["region_key"] = region_key
     doc["updated_at"] = now
+    # Dénormalise le nom de l'agence (valide au passage l'agency_id fourni).
+    if data.agency_id:
+        agency = await delivery_agency_service.get_agency(data.agency_id)  # 404 si inconnu
+        doc["delivery_provider"] = agency.name
+    else:
+        doc["delivery_provider"] = None
     result = await db[RULES_COLLECTION].find_one_and_update(
         {"region_key": region_key},
         {"$set": doc, "$setOnInsert": {"created_at": now}},
@@ -119,6 +127,7 @@ async def compute_delivery_fee(region: Optional[str], subtotal: float) -> Delive
         free_delivery_applied=free_applied,
         total=round(subtotal + fee, 2),
         currency=rule.get("currency", "XOF"),
+        agency_id=rule.get("agency_id"),
         delivery_provider=rule.get("delivery_provider"),
         eta_days_min=rule.get("eta_days_min"),
         eta_days_max=rule.get("eta_days_max"),
