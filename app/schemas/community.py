@@ -10,6 +10,7 @@ class CreatePostRequest(BaseModel):
     caption: Optional[str] = None
     media_urls: List[str] = []
     related_destination_id: Optional[str] = None
+    related_experience_id: Optional[str] = None
     group_id: Optional[str] = None
     location: Optional[GeoPoint] = None
 
@@ -23,6 +24,8 @@ class PostResponse(BaseModel):
     caption: Optional[str] = None
     media_urls: List[str]
     related_destination_id: Optional[str] = None
+    related_experience_id: Optional[str] = None
+    related_experience_title: Optional[str] = None
     group_id: Optional[str] = None
     location: Optional[GeoPoint] = None
     like_count: int

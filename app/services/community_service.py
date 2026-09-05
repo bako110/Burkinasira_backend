@@ -32,11 +32,17 @@ QUESTIONS_COLLECTION = "community_questions"
 ANSWERS_COLLECTION = "community_answers"
 REPORTS_COLLECTION = "content_reports"
 USERS_COLLECTION = "users"
+EXPERIENCES_COLLECTION = "experiences"
 
 
 # --- Publications ---
 
-def _post_to_response(doc: dict, author_doc: Optional[dict] = None, is_liked_by_me: bool = False) -> PostResponse:
+def _post_to_response(
+    doc: dict,
+    author_doc: Optional[dict] = None,
+    is_liked_by_me: bool = False,
+    experience_title: Optional[str] = None,
+) -> PostResponse:
     return PostResponse(
         id=str(doc["_id"]),
         author_id=doc["author_id"],
@@ -46,6 +52,8 @@ def _post_to_response(doc: dict, author_doc: Optional[dict] = None, is_liked_by_
         caption=doc.get("caption"),
         media_urls=doc.get("media_urls", []),
         related_destination_id=doc.get("related_destination_id"),
+        related_experience_id=doc.get("related_experience_id"),
+        related_experience_title=experience_title,
         group_id=doc.get("group_id"),
         location=doc.get("location"),
         like_count=doc.get("like_count", 0),
@@ -53,6 +61,17 @@ def _post_to_response(doc: dict, author_doc: Optional[dict] = None, is_liked_by_
         is_liked_by_me=is_liked_by_me,
         created_at=doc["created_at"],
     )
+
+
+async def _experience_titles_by_id(db, experience_ids: set) -> dict:
+    """Titres des expériences liées, indexés par id (chaînes)."""
+    valid = [ObjectId(e) for e in experience_ids if e and ObjectId.is_valid(e)]
+    if not valid:
+        return {}
+    docs = await db[EXPERIENCES_COLLECTION].find(
+        {"_id": {"$in": valid}}, {"title": 1}
+    ).to_list(length=None)
+    return {str(d["_id"]): d.get("title") for d in docs}
 
 
 async def create_post(data: CreatePostRequest, author_id: str) -> PostResponse:
@@ -70,6 +89,15 @@ async def create_post(data: CreatePostRequest, author_id: str) -> PostResponse:
                 detail="Seuls les membres du groupe peuvent y publier",
             )
 
+    experience_title = None
+    if data.related_experience_id:
+        if not ObjectId.is_valid(data.related_experience_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expérience introuvable")
+        exp_doc = await db[EXPERIENCES_COLLECTION].find_one({"_id": ObjectId(data.related_experience_id)})
+        if not exp_doc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expérience introuvable")
+        experience_title = exp_doc.get("title")
+
     now = datetime.utcnow()
     doc = data.model_dump()
     doc["author_id"] = author_id
@@ -82,7 +110,7 @@ async def create_post(data: CreatePostRequest, author_id: str) -> PostResponse:
     doc["_id"] = result.inserted_id
 
     author_doc = await db[USERS_COLLECTION].find_one({"_id": ObjectId(author_id)}) if ObjectId.is_valid(author_id) else None
-    return _post_to_response(doc, author_doc)
+    return _post_to_response(doc, author_doc, experience_title=experience_title)
 
 
 async def list_posts(
@@ -115,8 +143,17 @@ async def list_posts(
         ).to_list(length=None)
         liked_post_ids = {d["post_id"] for d in like_docs}
 
+    experience_titles = await _experience_titles_by_id(
+        db, {d.get("related_experience_id") for d in docs}
+    )
+
     items = [
-        _post_to_response(d, authors_by_id.get(d["author_id"]), is_liked_by_me=str(d["_id"]) in liked_post_ids)
+        _post_to_response(
+            d,
+            authors_by_id.get(d["author_id"]),
+            is_liked_by_me=str(d["_id"]) in liked_post_ids,
+            experience_title=experience_titles.get(d.get("related_experience_id")),
+        )
         for d in docs
     ]
     return {"items": items, "total": total, "page": page, "page_size": page_size}

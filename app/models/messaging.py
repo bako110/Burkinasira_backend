@@ -10,6 +10,9 @@ class ConversationKind(str, Enum):
     TOURISTE_RESTAURANT = "touriste_restaurant"
     TOURISTE_ARTISAN = "touriste_artisan"
     TOURISTE_TRANSPORT = "touriste_transport"
+    # Tourisme communautaire : touriste <-> hôte d'une expérience
+    # (rencontre habitant, hébergement chez l'habitant, visite de village...).
+    TOURISTE_HOTE = "touriste_hote"
     ENTREPRISE_PRESTATAIRE = "entreprise_prestataire"
     SUPPORT_CLIENT = "support_client"
     GROUPE_VOYAGEURS = "groupe_voyageurs"

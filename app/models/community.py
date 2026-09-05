@@ -26,6 +26,8 @@ class CommunityPost(BaseModel):
     caption: Optional[str] = None
     media_urls: List[str] = []
     related_destination_id: Optional[str] = None
+    # Expérience communautaire vécue et racontée dans ce post / carnet de voyage.
+    related_experience_id: Optional[str] = None
     group_id: Optional[str] = None
     location: Optional[GeoPoint] = None
     like_count: int = 0
