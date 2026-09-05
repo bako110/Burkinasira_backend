@@ -366,6 +366,13 @@ async def create_order(data: CreateOrderRequest, buyer_id: str) -> OrderResponse
 
     mode = data.fulfillment_mode
     mode_value = mode.value if isinstance(mode, FulfillmentMode) else mode
+    # Une commande doit choisir un mode concret : « les_deux » est ambigu
+    # (retrait ou livraison ?) et contournerait le calcul des frais.
+    if mode_value not in (FulfillmentMode.LIVRAISON.value, FulfillmentMode.RETRAIT.value):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Le mode de commande doit être « livraison » ou « retrait »",
+        )
     if product.fulfillment_mode not in (mode_value, FulfillmentMode.LES_DEUX.value):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -392,7 +399,7 @@ async def create_order(data: CreateOrderRequest, buyer_id: str) -> OrderResponse
     now = datetime.utcnow()
     doc = {
         "buyer_id": buyer_id,
-        "product_id": data.product_id,
+        "product_id": product.id,
         "quantity": data.quantity,
         "unit_price": product.price,
         "subtotal": round(subtotal, 2),
@@ -413,7 +420,7 @@ async def create_order(data: CreateOrderRequest, buyer_id: str) -> OrderResponse
     doc["_id"] = result.inserted_id
 
     await db[PRODUCTS_COLLECTION].update_one(
-        {"_id": ObjectId(data.product_id)},
+        {"_id": ObjectId(product.id)},
         {"$inc": {"stock_quantity": -data.quantity}},
     )
 
