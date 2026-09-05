@@ -140,6 +140,7 @@ class OrderResponse(BaseModel):
     id: str
     buyer_id: str
     product_id: str
+    artisan_id: Optional[str] = None
     quantity: int
     unit_price: float
     subtotal: float

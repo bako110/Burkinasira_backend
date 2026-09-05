@@ -15,6 +15,7 @@ class NotificationCategory(str, Enum):
     PROMOTION_PERSONNALISEE = "promotion_personnalisee"
     MESSAGE_PRESTATAIRE = "message_prestataire"
     RAPPEL_VOYAGE = "rappel_voyage"
+    COMMANDE_ARTISANALE = "commande_artisanale"
 
 
 class Notification(BaseModel):

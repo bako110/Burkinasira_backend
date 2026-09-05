@@ -209,8 +209,19 @@ async def create_order(
 
 @router.get("/orders/me", response_model=list)
 async def list_my_orders(current_user: TokenPayload = Depends(get_current_user)):
-    """Historique de ses commandes."""
+    """Historique de ses commandes (en tant qu'acheteur)."""
     return await artisan_service.list_my_orders(current_user.sub)
+
+
+@router.get("/orders/received", response_model=list)
+async def list_received_orders(
+    status: Optional[ArtisanOrderStatus] = Query(default=None),
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+):
+    """(Vendeur) Commandes reçues sur ses produits, avec leur suivi de livraison."""
+    return await artisan_service.list_received_orders(
+        current_user.sub, status_filter=status.value if status else None,
+    )
 
 
 @router.get("/orders", response_model=list)
@@ -236,7 +247,7 @@ async def list_orders(
 
 @router.get("/orders/{order_id}", response_model=OrderResponse)
 async def get_order(order_id: str, current_user: TokenPayload = Depends(get_current_user)):
-    """Détail d'une commande (acheteur, ou staff)."""
+    """Détail d'une commande : acheteur, artisan propriétaire du produit, ou staff."""
     is_staff = current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
     return await artisan_service.get_order(order_id, requester_id=current_user.sub, is_staff=is_staff)
 

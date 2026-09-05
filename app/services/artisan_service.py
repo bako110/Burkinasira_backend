@@ -1,8 +1,11 @@
+import logging
 from datetime import datetime
 from typing import Optional
 from bson import ObjectId
 from fastapi import HTTPException, status
 from app.core.database import get_database
+
+logger = logging.getLogger("artisan_service")
 from app.utils.slug import generate_unique_slug, find_by_slug_or_id, ensure_slug_index
 from app.models.artisan import (
     ProductCategory,
@@ -363,6 +366,7 @@ def _order_to_response(doc: dict) -> OrderResponse:
         id=str(doc["_id"]),
         buyer_id=doc["buyer_id"],
         product_id=doc["product_id"],
+        artisan_id=doc.get("artisan_id"),
         quantity=doc["quantity"],
         unit_price=doc["unit_price"],
         subtotal=subtotal,
@@ -472,12 +476,31 @@ async def create_order(data: CreateOrderRequest, buyer_id: str) -> OrderResponse
         {"$inc": {"stock_quantity": -data.quantity}},
     )
 
-    return _order_to_response(doc)
+    response = _order_to_response(doc)
+    # Notifie acheteur + artisan (in-app + email). Best-effort, jamais bloquant.
+    try:
+        from app.services import order_notification_service  # import différé (cycle)
+
+        await order_notification_service.notify_order_created(response.model_dump())
+    except Exception:  # noqa: BLE001
+        logger.exception("Notification de création de commande échouée (order=%s)", response.id)
+    return response
 
 
 async def list_my_orders(buyer_id: str) -> list:
     db = get_database()
     docs = await db[ORDERS_COLLECTION].find({"buyer_id": buyer_id}).sort("created_at", -1).to_list(length=None)
+    return [_order_to_response(d) for d in docs]
+
+
+async def list_received_orders(artisan_user_id: str, status_filter: Optional[str] = None) -> list:
+    """Commandes reçues par un artisan sur ses produits (vue vendeur, lecture seule)."""
+    artisan = await get_artisan_by_user_id(artisan_user_id)  # 404 si pas de profil
+    db = get_database()
+    query: dict = {"artisan_id": artisan.id}
+    if status_filter:
+        query["status"] = status_filter
+    docs = await db[ORDERS_COLLECTION].find(query).sort("created_at", -1).to_list(length=None)
     return [_order_to_response(d) for d in docs]
 
 
@@ -494,7 +517,15 @@ async def _get_order_doc(order_id: str) -> dict:
 async def get_order(order_id: str, requester_id: Optional[str] = None, is_staff: bool = False) -> OrderResponse:
     doc = await _get_order_doc(order_id)
     if not is_staff and requester_id is not None and doc["buyer_id"] != requester_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès refusé à cette commande")
+        # Autorise aussi l'artisan propriétaire du produit commandé.
+        seller_uid = None
+        if doc.get("artisan_id"):
+            try:
+                seller_uid = (await get_artisan(doc["artisan_id"])).user_id
+            except HTTPException:
+                seller_uid = None
+        if seller_uid != requester_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès refusé à cette commande")
     return _order_to_response(doc)
 
 
@@ -571,4 +602,13 @@ async def update_order_status(
         {"_id": doc["_id"]},
         {"$set": set_fields, "$push": {"status_history": event}},
     )
-    return await get_order(order_id, is_staff=True)
+    response = await get_order(order_id, is_staff=True)
+
+    # Notifie acheteur + artisan du changement de statut. Best-effort.
+    try:
+        from app.services import order_notification_service  # import différé (cycle)
+
+        await order_notification_service.notify_order_status_changed(response.model_dump(), previous_status=current)
+    except Exception:  # noqa: BLE001
+        logger.exception("Notification de changement de statut échouée (order=%s)", order_id)
+    return response
