@@ -14,8 +14,12 @@ from app.schemas.artisan import (
     ProductListResponse,
     CreateOrderRequest,
     OrderResponse,
+    UpsertDeliveryFeeRuleRequest,
+    DeliveryFeeRuleResponse,
+    DeliveryFeeQuoteRequest,
+    DeliveryFeeQuote,
 )
-from app.services import artisan_service
+from app.services import artisan_service, delivery_fee_service
 
 router = APIRouter(prefix="/market", tags=["Artisanat et marketplace — BurkinaSira Market"])
 
@@ -182,7 +186,12 @@ async def create_order(
     data: CreateOrderRequest,
     current_user: TokenPayload = Depends(get_current_user),
 ):
-    """Commander un produit (livraison ou retrait)."""
+    """Commander un produit (livraison ou retrait).
+
+    En mode livraison, `delivery_region` est obligatoire : les frais de livraison
+    sont calculés automatiquement d'après la grille par région (agence de
+    livraison) et ajoutés au total.
+    """
     return await artisan_service.create_order(data, buyer_id=current_user.sub)
 
 
@@ -190,3 +199,39 @@ async def create_order(
 async def list_my_orders(current_user: TokenPayload = Depends(get_current_user)):
     """Historique de ses commandes."""
     return await artisan_service.list_my_orders(current_user.sub)
+
+
+# ============================================
+# FRAIS DE LIVRAISON — GRILLE PAR RÉGION (§19)
+# ============================================
+
+@router.post("/delivery-fees/quote", response_model=DeliveryFeeQuote)
+async def quote_delivery_fee(data: DeliveryFeeQuoteRequest):
+    """Estimer les frais de livraison pour une région et un sous-total (avant commande)."""
+    return await delivery_fee_service.compute_delivery_fee(data.region, data.subtotal)
+
+
+@router.get("/delivery-fees", response_model=list)
+async def list_delivery_fee_rules(
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
+):
+    """(Admin/Modérateur) Grille complète des frais de livraison."""
+    return await delivery_fee_service.list_rules()
+
+
+@router.put("/delivery-fees", response_model=DeliveryFeeRuleResponse)
+async def upsert_delivery_fee_rule(
+    data: UpsertDeliveryFeeRuleRequest,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Créer ou mettre à jour le tarif d'une région (`region="*"` = tarif par défaut)."""
+    return await delivery_fee_service.upsert_rule(data)
+
+
+@router.delete("/delivery-fees/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_delivery_fee_rule(
+    rule_id: str,
+    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+):
+    """(Admin) Supprimer le tarif d'une région."""
+    await delivery_fee_service.delete_rule(rule_id)

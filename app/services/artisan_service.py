@@ -4,7 +4,8 @@ from bson import ObjectId
 from fastapi import HTTPException, status
 from app.core.database import get_database
 from app.utils.slug import generate_unique_slug, find_by_slug_or_id, ensure_slug_index
-from app.models.artisan import ProductCategory, ArtisanStatus, ProductStatus
+from app.models.artisan import ProductCategory, ArtisanStatus, ProductStatus, FulfillmentMode
+from app.services import delivery_fee_service
 from app.schemas.artisan import (
     CreateArtisanRequest,
     UpdateArtisanRequest,
@@ -336,12 +337,20 @@ async def delete_product(product_id: str, current_artisan_id: Optional[str], is_
 # --- Commandes ---
 
 def _order_to_response(doc: dict) -> OrderResponse:
+    subtotal = doc.get("subtotal", doc["unit_price"] * doc["quantity"])
+    delivery_fee = doc.get("delivery_fee", 0.0)
     return OrderResponse(
         id=str(doc["_id"]),
         buyer_id=doc["buyer_id"],
         product_id=doc["product_id"],
         quantity=doc["quantity"],
         unit_price=doc["unit_price"],
+        subtotal=subtotal,
+        delivery_fee=delivery_fee,
+        delivery_region=doc.get("delivery_region"),
+        delivery_provider=doc.get("delivery_provider"),
+        delivery_eta_days_min=doc.get("delivery_eta_days_min"),
+        delivery_eta_days_max=doc.get("delivery_eta_days_max"),
         total_price=doc["total_price"],
         currency=doc["currency"],
         fulfillment_mode=doc["fulfillment_mode"],
@@ -355,6 +364,30 @@ async def create_order(data: CreateOrderRequest, buyer_id: str) -> OrderResponse
     if product.stock_quantity < data.quantity:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Stock insuffisant")
 
+    mode = data.fulfillment_mode
+    mode_value = mode.value if isinstance(mode, FulfillmentMode) else mode
+    if product.fulfillment_mode not in (mode_value, FulfillmentMode.LES_DEUX.value):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ce mode de retrait/livraison n'est pas proposé pour ce produit",
+        )
+
+    subtotal = product.price * data.quantity
+
+    # Frais de livraison auto-calculés (agence de livraison) uniquement en mode livraison.
+    delivery_fee = 0.0
+    delivery_region = None
+    delivery_provider = None
+    eta_min = None
+    eta_max = None
+    if mode_value == FulfillmentMode.LIVRAISON.value:
+        quote = await delivery_fee_service.compute_delivery_fee(data.delivery_region, subtotal)
+        delivery_fee = quote.delivery_fee
+        delivery_region = quote.region
+        delivery_provider = quote.delivery_provider
+        eta_min = quote.eta_days_min
+        eta_max = quote.eta_days_max
+
     db = get_database()
     now = datetime.utcnow()
     doc = {
@@ -362,9 +395,16 @@ async def create_order(data: CreateOrderRequest, buyer_id: str) -> OrderResponse
         "product_id": data.product_id,
         "quantity": data.quantity,
         "unit_price": product.price,
-        "total_price": product.price * data.quantity,
+        "subtotal": round(subtotal, 2),
+        "delivery_fee": delivery_fee,
+        "delivery_region": delivery_region,
+        "delivery_address": data.delivery_address,
+        "delivery_provider": delivery_provider,
+        "delivery_eta_days_min": eta_min,
+        "delivery_eta_days_max": eta_max,
+        "total_price": round(subtotal + delivery_fee, 2),
         "currency": product.currency,
-        "fulfillment_mode": data.fulfillment_mode.value,
+        "fulfillment_mode": mode_value,
         "status": "pending",
         "created_at": now,
         "updated_at": now,

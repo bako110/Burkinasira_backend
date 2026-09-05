@@ -79,3 +79,27 @@ class Product(BaseModel):
     class Config:
         populate_by_name = True
         use_enum_values = True
+
+
+class DeliveryFeeRule(BaseModel):
+    """Grille des frais de livraison des produits artisanaux (§19).
+
+    Les commandes en mode « livraison » sont confiées à une agence de livraison ;
+    les frais sont calculés automatiquement à partir de cette grille selon la
+    région de destination du client, puis reversés à l'agence.
+    """
+    id: Optional[str] = Field(default=None, alias="_id")
+    region: str  # région de destination ; "*" = tarif par défaut
+    fee: float = Field(..., ge=0)  # frais fixes pour cette région
+    currency: str = "XOF"
+    delivery_provider: Optional[str] = None  # agence de livraison assignée
+    free_delivery_threshold: Optional[float] = Field(default=None, ge=0)
+    eta_days_min: Optional[int] = Field(default=None, ge=0)
+    eta_days_max: Optional[int] = Field(default=None, ge=0)
+    active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        populate_by_name = True
+        use_enum_values = True

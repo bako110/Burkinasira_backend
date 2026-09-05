@@ -116,6 +116,10 @@ class CreateOrderRequest(BaseModel):
     product_id: str
     quantity: int = Field(..., gt=0)
     fulfillment_mode: FulfillmentMode
+    # Région de destination — obligatoire en mode livraison, sert au calcul
+    # automatique des frais de livraison (agence de livraison).
+    delivery_region: Optional[str] = None
+    delivery_address: Optional[str] = None
 
 
 class OrderResponse(BaseModel):
@@ -124,8 +128,58 @@ class OrderResponse(BaseModel):
     product_id: str
     quantity: int
     unit_price: float
+    subtotal: float
+    delivery_fee: float
+    delivery_region: Optional[str] = None
+    delivery_provider: Optional[str] = None
+    delivery_eta_days_min: Optional[int] = None
+    delivery_eta_days_max: Optional[int] = None
     total_price: float
     currency: str
     fulfillment_mode: FulfillmentMode
     status: str
     created_at: datetime
+
+
+# --- Grille des frais de livraison (§19) ---
+
+class UpsertDeliveryFeeRuleRequest(BaseModel):
+    region: str = Field(..., min_length=1, max_length=100, description='Région de destination ; "*" pour le tarif par défaut')
+    fee: float = Field(..., ge=0)
+    currency: str = "XOF"
+    delivery_provider: Optional[str] = None
+    free_delivery_threshold: Optional[float] = Field(default=None, ge=0)
+    eta_days_min: Optional[int] = Field(default=None, ge=0)
+    eta_days_max: Optional[int] = Field(default=None, ge=0)
+    active: bool = True
+
+
+class DeliveryFeeRuleResponse(BaseModel):
+    id: str
+    region: str
+    fee: float
+    currency: str
+    delivery_provider: Optional[str] = None
+    free_delivery_threshold: Optional[float] = None
+    eta_days_min: Optional[int] = None
+    eta_days_max: Optional[int] = None
+    active: bool
+    updated_at: datetime
+
+
+class DeliveryFeeQuoteRequest(BaseModel):
+    region: str = Field(..., min_length=1, max_length=100)
+    subtotal: float = Field(..., ge=0)
+
+
+class DeliveryFeeQuote(BaseModel):
+    region: str
+    matched_region: str  # région réellement appliquée ("*" si tarif par défaut)
+    subtotal: float
+    delivery_fee: float
+    free_delivery_applied: bool
+    total: float
+    currency: str
+    delivery_provider: Optional[str] = None
+    eta_days_min: Optional[int] = None
+    eta_days_max: Optional[int] = None
