@@ -2,12 +2,27 @@ from datetime import datetime, timedelta
 from collections import OrderedDict
 from app.core.database import get_database
 from app.models.booking import BookingStatus
+from app.models.artisan import ArtisanOrderStatus
 from app.schemas.guide_analytics import TimeSeriesPoint, GuideAnalyticsSummary
 
 COLLECTION = "bookings"
+ARTISAN_ORDERS_COLLECTION = "artisan_orders"
 
 # Réservations comptant comme "revenu réel" (pas juste une demande en attente/annulée).
 REVENUE_STATUSES = {BookingStatus.CONFIRMED.value, BookingStatus.COMPLETED.value}
+
+# Commandes artisanales : "revenu réel" dès la confirmation (même hors livraison
+# terminée) ; "complétée" seulement une fois livrée au client.
+ARTISAN_REVENUE_STATUSES = {
+    ArtisanOrderStatus.CONFIRMED.value,
+    ArtisanOrderStatus.HANDED_TO_AGENCY.value,
+    ArtisanOrderStatus.IN_DELIVERY.value,
+    ArtisanOrderStatus.DELIVERED.value,
+}
+ARTISAN_DECIDED_STATUSES = ARTISAN_REVENUE_STATUSES | {
+    ArtisanOrderStatus.CANCELLED.value,
+    ArtisanOrderStatus.RETURNED.value,
+}
 
 
 def _last_n_days(n: int) -> list:
@@ -34,17 +49,40 @@ async def get_guide_analytics(guide_id: str, currency: str = "XOF") -> GuideAnal
 
 async def get_provider_analytics(item_type: str, item_id: str, currency: str = "XOF") -> GuideAnalyticsSummary:
     db = get_database()
-    query = {"item_type": item_type, "item_id": item_id}
-    docs = await db[COLLECTION].find(query).to_list(length=None)
+
+    if item_type == "product":
+        # Les commandes artisanales vivent dans leur propre collection (livraison/
+        # retrait, statuts dédiés) : on les relit ici sous la même forme que les
+        # réservations génériques (customer_id/total_price/status) pour réutiliser
+        # le reste du calcul tel quel.
+        raw_docs = await db[ARTISAN_ORDERS_COLLECTION].find({"artisan_id": item_id}).to_list(length=None)
+        docs = [
+            {
+                "customer_id": d["buyer_id"],
+                "total_price": d["total_price"],
+                "status": d.get("status", ArtisanOrderStatus.PENDING.value),
+                "created_at": d["created_at"],
+            }
+            for d in raw_docs
+        ]
+        revenue_statuses = ARTISAN_REVENUE_STATUSES
+        decided_statuses = ARTISAN_DECIDED_STATUSES
+        completed_status = ArtisanOrderStatus.DELIVERED.value
+    else:
+        query = {"item_type": item_type, "item_id": item_id}
+        docs = await db[COLLECTION].find(query).to_list(length=None)
+        revenue_statuses = REVENUE_STATUSES
+        decided_statuses = REVENUE_STATUSES | {BookingStatus.CANCELLED.value, BookingStatus.REFUNDED.value}
+        completed_status = BookingStatus.COMPLETED.value
 
     total_customers = len({d["customer_id"] for d in docs})
     total_bookings = len(docs)
-    revenue_docs = [d for d in docs if d.get("status") in REVENUE_STATUSES]
+    revenue_docs = [d for d in docs if d.get("status") in revenue_statuses]
     total_revenue = sum(d["total_price"] for d in revenue_docs)
     average_booking_value = round(total_revenue / len(revenue_docs), 2) if revenue_docs else 0.0
 
-    decided_docs = [d for d in docs if d.get("status") in REVENUE_STATUSES | {BookingStatus.CANCELLED.value, BookingStatus.REFUNDED.value}]
-    completed_docs = [d for d in docs if d.get("status") == BookingStatus.COMPLETED.value]
+    decided_docs = [d for d in docs if d.get("status") in decided_statuses]
+    completed_docs = [d for d in docs if d.get("status") == completed_status]
     completion_rate = round(len(completed_docs) / len(decided_docs) * 100, 1) if decided_docs else 0.0
 
     # --- Quotidien : 30 derniers jours ---
@@ -66,7 +104,7 @@ async def get_provider_analytics(item_type: str, item_id: str, currency: str = "
         day_key = created.date().isoformat()
         month_key = f"{created.year:04d}-{created.month:02d}"
         year_key = str(created.year)
-        is_revenue = d.get("status") in REVENUE_STATUSES
+        is_revenue = d.get("status") in revenue_statuses
 
         for bucket, key in ((daily_buckets, day_key), (monthly_buckets, month_key), (yearly_buckets, year_key)):
             if key in bucket:
