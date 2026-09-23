@@ -256,14 +256,17 @@ async def get_order(order_id: str, current_user: TokenPayload = Depends(get_curr
 async def update_order_status(
     order_id: str,
     data: UpdateOrderStatusRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN, UserRole.MODERATOR)),
 ):
-    """(Admin/Modérateur) Faire avancer le statut de livraison d'une commande.
+    """(Vendeur propriétaire/Admin/Modérateur) Faire avancer le statut de livraison d'une commande.
 
     Transitions : pending → confirmed → handed_to_agency → in_delivery →
     delivered ; cancelled/returned réapprovisionnent le stock et retirent le
     montant du dû à l'agence.
     """
+    is_staff = current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
+    if not is_staff:
+        await artisan_service.assert_owns_order(order_id, current_user.sub)
     return await artisan_service.update_order_status(order_id, data, actor_id=current_user.sub)
 
 

@@ -514,6 +514,21 @@ async def _get_order_doc(order_id: str) -> dict:
     return doc
 
 
+async def assert_owns_order(order_id: str, user_id: str) -> None:
+    """403 si user_id n'est ni l'acheteur ni l'artisan propriétaire du produit commandé."""
+    doc = await _get_order_doc(order_id)
+    if doc["buyer_id"] == user_id:
+        return
+    seller_uid = None
+    if doc.get("artisan_id"):
+        try:
+            seller_uid = (await get_artisan(doc["artisan_id"])).user_id
+        except HTTPException:
+            seller_uid = None
+    if seller_uid != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès refusé à cette commande")
+
+
 async def get_order(order_id: str, requester_id: Optional[str] = None, is_staff: bool = False) -> OrderResponse:
     doc = await _get_order_doc(order_id)
     if not is_staff and requester_id is not None and doc["buyer_id"] != requester_id:
