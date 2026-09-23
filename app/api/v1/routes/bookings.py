@@ -16,7 +16,7 @@ from app.services.booking_provider_resolver import is_authorized_for_establishme
 
 router = APIRouter(prefix="/bookings", tags=["Réservation et billetterie"])
 
-PROVIDER_ITEM_TYPES = {"hotel", "restaurant", "transport"}
+PROVIDER_ITEM_TYPES = {"hotel", "restaurant", "transport", "product", "health"}
 
 
 @router.post("", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
@@ -45,7 +45,7 @@ async def get_booking_by_reference(reference: str):
 
 @router.get("/provider/received", response_model=list)
 async def list_received_bookings(
-    item_type: str = Query(..., description="hotel, restaurant ou transport"),
+    item_type: str = Query(..., description="hotel, restaurant, transport, product ou health"),
     item_id: str = Query(...),
     status_filter: Optional[BookingStatus] = None,
     current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
