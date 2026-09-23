@@ -11,6 +11,7 @@ _PROVIDER_LOOKUP = {
     "guide": ("guide_profiles", "user_id"),
     "event": ("events", "organizer_id"),
     "experience": ("experiences", "host_id"),
+    "health": ("health_facilities", "owner_id"),
 }
 
 

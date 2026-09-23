@@ -66,6 +66,7 @@ async def _find_pending_establishments(db, owner_id: str) -> list:
     from app.models.cuisine import CuisineStatus
     from app.models.mobility import TransportProviderStatus
     from app.models.artisan import ArtisanStatus
+    from app.models.health import HealthFacilityStatus
 
     summaries = []
     async for doc in db["hotels"].find({"owner_id": owner_id, "status": HotelStatus.DRAFT.value}, {"name": 1}):
@@ -80,6 +81,10 @@ async def _find_pending_establishments(db, owner_id: str) -> list:
         {"user_id": owner_id, "status": ArtisanStatus.PENDING.value}, {"display_name": 1}
     ):
         summaries.append(PendingEstablishmentSummary(kind="artisan", name=doc["display_name"]))
+    async for doc in db["health_facilities"].find(
+        {"owner_id": owner_id, "status": HealthFacilityStatus.DRAFT.value}, {"name": 1}
+    ):
+        summaries.append(PendingEstablishmentSummary(kind="health", name=doc["name"]))
     return summaries
 
 
@@ -179,6 +184,7 @@ async def _publish_pending_establishments(db, owner_id: str) -> None:
     from app.models.cuisine import CuisineStatus
     from app.models.mobility import TransportProviderStatus
     from app.models.artisan import ArtisanStatus
+    from app.models.health import HealthFacilityStatus
 
     now = datetime.utcnow()
     await db["hotels"].update_many(
@@ -196,6 +202,10 @@ async def _publish_pending_establishments(db, owner_id: str) -> None:
     await db["artisans"].update_many(
         {"user_id": owner_id, "status": ArtisanStatus.PENDING.value},
         {"$set": {"status": ArtisanStatus.ACTIVE.value, "updated_at": now}},
+    )
+    await db["health_facilities"].update_many(
+        {"owner_id": owner_id, "status": HealthFacilityStatus.DRAFT.value},
+        {"$set": {"status": HealthFacilityStatus.PUBLISHED.value, "updated_at": now}},
     )
 
 

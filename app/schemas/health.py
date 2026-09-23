@@ -51,6 +51,7 @@ class HealthFacilitySummary(BaseModel):
 
 class HealthFacilityDetail(BaseModel):
     id: str
+    owner_id: Optional[str] = None
     name: str
     slug: str
     type: HealthFacilityType
@@ -64,6 +65,7 @@ class HealthFacilityDetail(BaseModel):
     is_on_duty: bool
     services: List[str]
     contact_phone: Optional[str] = None
+    status: HealthFacilityStatus = HealthFacilityStatus.PUBLISHED
     data_source: DataSource
     created_at: datetime
     updated_at: datetime

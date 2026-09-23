@@ -42,6 +42,14 @@ async def list_my_favorites(current_user: TokenPayload = Depends(get_current_use
     return await health_service.list_favorites(current_user.sub)
 
 
+@router.get("/me/list", response_model=list)
+async def list_my_health_facilities(
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN)),
+):
+    """(Provider) Liste de mes établissements de santé, tous statuts confondus."""
+    return await health_service.list_my_health_facilities(current_user.sub)
+
+
 @router.get("/{facility_id}", response_model=HealthFacilityDetail)
 async def get_health_facility(facility_id: str):
     """Fiche détaillée : horaires, services, date/source de mise à jour."""
@@ -63,26 +71,33 @@ async def remove_favorite(facility_id: str, current_user: TokenPayload = Depends
 @router.post("", response_model=HealthFacilityDetail, status_code=status.HTTP_201_CREATED)
 async def create_health_facility(
     data: CreateHealthFacilityRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
+    current_user: TokenPayload = Depends(require_role(UserRole.PROVIDER, UserRole.ADMIN, UserRole.MODERATOR)),
 ):
-    """(Admin) Ajouter un établissement de santé."""
-    return await health_service.create_health_facility(data, created_by=current_user.sub)
+    """(Provider/Admin/Moderateur) Ajouter un établissement de santé. Publié directement si le compte
+    est déjà vérifié, sinon enregistré en brouillon en attendant l'approbation admin."""
+    return await health_service.create_health_facility(
+        data, owner_id=current_user.sub, is_admin=current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
+    )
 
 
 @router.patch("/{facility_id}", response_model=HealthFacilityDetail)
 async def update_health_facility(
     facility_id: str,
     data: UpdateHealthFacilityRequest,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN, UserRole.MODERATOR)),
+    current_user: TokenPayload = Depends(get_current_user),
 ):
-    """(Admin) Mettre à jour un établissement (horaires, statut garde, etc.)."""
-    return await health_service.update_health_facility(facility_id, data)
+    """(Owner/Admin) Mettre à jour un établissement (horaires, statut garde, etc.)."""
+    return await health_service.update_health_facility(
+        facility_id, data, current_user.sub, is_admin=current_user.role in (UserRole.ADMIN, UserRole.MODERATOR)
+    )
 
 
 @router.delete("/{facility_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_health_facility(
     facility_id: str,
-    current_user: TokenPayload = Depends(require_role(UserRole.ADMIN)),
+    current_user: TokenPayload = Depends(get_current_user),
 ):
-    """(Admin) Supprimer un établissement de santé."""
-    await health_service.delete_health_facility(facility_id)
+    """(Owner/Admin) Supprimer un établissement de santé."""
+    await health_service.delete_health_facility(
+        facility_id, current_user.sub, is_admin=current_user.role == UserRole.ADMIN
+    )

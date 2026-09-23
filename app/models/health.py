@@ -23,6 +23,7 @@ class HealthFacilityStatus(str, Enum):
 
 class HealthFacility(BaseModel):
     id: Optional[str] = Field(default=None, alias="_id")
+    owner_id: Optional[str] = None
     name: str
     type: HealthFacilityType
     description: Optional[str] = None

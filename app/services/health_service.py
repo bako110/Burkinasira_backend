@@ -44,6 +44,7 @@ def _to_summary(doc: dict) -> HealthFacilitySummary:
 def _to_detail(doc: dict) -> HealthFacilityDetail:
     return HealthFacilityDetail(
         id=str(doc["_id"]),
+        owner_id=doc.get("owner_id"),
         name=doc["name"],
         slug=doc["slug"],
         type=doc["type"],
@@ -57,19 +58,27 @@ def _to_detail(doc: dict) -> HealthFacilityDetail:
         is_on_duty=doc.get("is_on_duty", False),
         services=doc.get("services", []),
         contact_phone=doc.get("contact_phone"),
+        status=doc.get("status", HealthFacilityStatus.PUBLISHED.value),
         data_source=doc.get("data_source", {}),
         created_at=doc["created_at"],
         updated_at=doc["updated_at"],
     )
 
 
-async def create_health_facility(data: CreateHealthFacilityRequest, created_by: str) -> HealthFacilityDetail:
+async def create_health_facility(data: CreateHealthFacilityRequest, owner_id: str, is_admin: bool = False) -> HealthFacilityDetail:
     db = get_database()
     await ensure_slug_index(db, COLLECTION)
     now = datetime.utcnow()
     doc = data.model_dump()
+    doc["owner_id"] = owner_id
     doc["slug"] = await generate_unique_slug(db, COLLECTION, data.name)
-    doc["status"] = HealthFacilityStatus.PUBLISHED.value
+
+    if is_admin:
+        doc["status"] = HealthFacilityStatus.PUBLISHED.value
+    else:
+        from app.services import user_service
+        owner = await user_service.get_user_by_id(owner_id)
+        doc["status"] = HealthFacilityStatus.PUBLISHED.value if owner.is_verified else HealthFacilityStatus.DRAFT.value
     doc["data_source"] = {"verified": False, "source": None, "last_updated_at": now}
     doc["created_at"] = now
     doc["updated_at"] = now
@@ -77,6 +86,16 @@ async def create_health_facility(data: CreateHealthFacilityRequest, created_by: 
     result = await db[COLLECTION].insert_one(doc)
     doc["_id"] = result.inserted_id
     return _to_detail(doc)
+
+
+async def list_my_health_facilities(owner_id: str) -> list:
+    db = get_database()
+    from app.services.booking_provider_resolver import list_managed_establishment_ids
+
+    managed_ids = [ObjectId(i) for i in await list_managed_establishment_ids(owner_id, "health") if ObjectId.is_valid(i)]
+    query = {"$or": [{"owner_id": owner_id}, {"_id": {"$in": managed_ids}}]} if managed_ids else {"owner_id": owner_id}
+    docs = await db[COLLECTION].find(query).to_list(length=None)
+    return [_to_detail(d) for d in docs]
 
 
 async def list_health_facilities(
@@ -138,29 +157,40 @@ async def get_health_facility(facility_id: str) -> HealthFacilityDetail:
     return _to_detail(doc)
 
 
-async def update_health_facility(facility_id: str, data: UpdateHealthFacilityRequest) -> HealthFacilityDetail:
+async def update_health_facility(
+    facility_id: str, data: UpdateHealthFacilityRequest, current_user_id: str, is_admin: bool
+) -> HealthFacilityDetail:
     db = get_database()
     if not ObjectId.is_valid(facility_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Établissement de santé introuvable")
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(facility_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Établissement de santé introuvable")
+    if not is_admin:
+        from app.services.booking_provider_resolver import is_authorized_for_establishment
+
+        if not await is_authorized_for_establishment("health", facility_id, current_user_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez modifier que vos propres établissements")
 
     update_fields = data.model_dump(exclude_unset=True, exclude_none=True)
     if update_fields:
         update_fields["updated_at"] = datetime.utcnow()
         update_fields["data_source.last_updated_at"] = datetime.utcnow()
-        result = await db[COLLECTION].update_one({"_id": ObjectId(facility_id)}, {"$set": update_fields})
-        if result.matched_count == 0:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Établissement de santé introuvable")
+        await db[COLLECTION].update_one({"_id": ObjectId(facility_id)}, {"$set": update_fields})
 
     return await get_health_facility(facility_id)
 
 
-async def delete_health_facility(facility_id: str) -> None:
+async def delete_health_facility(facility_id: str, current_user_id: str, is_admin: bool) -> None:
     db = get_database()
     if not ObjectId.is_valid(facility_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Établissement de santé introuvable")
-    result = await db[COLLECTION].delete_one({"_id": ObjectId(facility_id)})
-    if result.deleted_count == 0:
+    doc = await db[COLLECTION].find_one({"_id": ObjectId(facility_id)})
+    if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Établissement de santé introuvable")
+    if doc.get("owner_id") != current_user_id and not is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez supprimer que vos propres établissements")
+    await db[COLLECTION].delete_one({"_id": ObjectId(facility_id)})
 
 
 async def add_favorite(user_id: str, facility_id: str) -> None:
