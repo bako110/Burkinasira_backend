@@ -14,6 +14,7 @@ from app.schemas.community import (
     AddToFavoriteListRequest,
     FavoriteListResponse,
     CreateGroupRequest,
+    UpdateGroupRequest,
     GroupResponse,
     GroupDetailResponse,
     CreateQuestionRequest,
@@ -21,8 +22,11 @@ from app.schemas.community import (
     CreateAnswerRequest,
     AnswerResponse,
     ReportContentRequest,
+    StartLiveRequest,
+    LiveSessionResponse,
+    LiveTokenResponse,
 )
-from app.services import community_service
+from app.services import community_service, live_service
 
 router = APIRouter(prefix="/community", tags=["Communauté"])
 
@@ -159,6 +163,17 @@ async def get_group(group_id: str):
     return await community_service.get_group_detail(group_id)
 
 
+@router.patch("/groups/{group_id}", response_model=GroupResponse)
+async def update_group(
+    group_id: str,
+    data: UpdateGroupRequest,
+    current_user: TokenPayload = Depends(get_current_user),
+):
+    """Modifier les paramètres d'un groupe (nom, description, logo/photo de couverture,
+    région, thème, visibilité) — réservé au créateur du groupe."""
+    return await community_service.update_group(group_id, data, current_user.sub)
+
+
 @router.post("/groups/{group_id}/join", response_model=GroupResponse)
 async def join_group(group_id: str, current_user: TokenPayload = Depends(get_current_user)):
     """Rejoindre un groupe de voyageurs."""
@@ -202,6 +217,45 @@ async def answer_question(
 ):
     """Répondre à une question."""
     return await community_service.answer_question(question_id, data, author_id=current_user.sub)
+
+
+# --- Live streaming ---
+
+@router.get("/live", response_model=list)
+async def list_live_sessions(group_id: Optional[str] = None):
+    """Lives en cours (globalement, ou filtrés sur un groupe)."""
+    return await live_service.list_live_sessions(group_id)
+
+
+@router.post("/live", response_model=LiveSessionResponse, status_code=status.HTTP_201_CREATED)
+async def start_live(
+    data: StartLiveRequest,
+    current_user: TokenPayload = Depends(get_current_user),
+):
+    """Démarrer un live : crée la session et la room LiveKit associée."""
+    return await live_service.start_live(data, host_id=current_user.sub)
+
+
+@router.get("/live/{session_id}", response_model=LiveSessionResponse)
+async def get_live_session(session_id: str):
+    """Détail d'une session de live."""
+    return await live_service.get_live_session(session_id)
+
+
+@router.post("/live/{session_id}/end", response_model=LiveSessionResponse)
+async def end_live(session_id: str, current_user: TokenPayload = Depends(get_current_user)):
+    """Terminer son propre live."""
+    return await live_service.end_live(session_id, current_user.sub)
+
+
+@router.post("/live/{session_id}/token", response_model=LiveTokenResponse)
+async def get_live_token(session_id: str, current_user: TokenPayload = Depends(get_current_user)):
+    """Jeton LiveKit pour rejoindre la room : publication vidéo pour l'hôte,
+    lecture seule (+ chat texte) pour les spectateurs."""
+    from app.services import user_service
+
+    user = await user_service.get_user_by_id(current_user.sub)
+    return await live_service.get_live_token(session_id, current_user.sub, user.full_name)
 
 
 # --- Signalement ---

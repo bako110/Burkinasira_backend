@@ -63,6 +63,17 @@ class Settings(BaseSettings):
     # signe le id_token avec l'un ou l'autre selon la plateforme).
     GOOGLE_CLIENT_IDS: Optional[str] = None
 
+    # Live streaming communautaire (LiveKit Cloud) — optionnel : tant que ces
+    # 3 valeurs ne sont pas fournies, les endpoints /community/live renvoient
+    # 503 (fonctionnalité annoncée comme indisponible, rien ne casse ailleurs).
+    LIVEKIT_URL: Optional[str] = None  # ex: wss://mon-projet.livekit.cloud
+    LIVEKIT_API_KEY: Optional[str] = None
+    LIVEKIT_API_SECRET: Optional[str] = None
+
+    @property
+    def livekit_enabled(self) -> bool:
+        return bool(self.LIVEKIT_URL and self.LIVEKIT_API_KEY and self.LIVEKIT_API_SECRET)
+
     @property
     def google_client_ids(self) -> list:
         if not self.GOOGLE_CLIENT_IDS or not self.GOOGLE_CLIENT_IDS.strip():

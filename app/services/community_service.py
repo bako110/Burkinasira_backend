@@ -13,6 +13,7 @@ from app.schemas.community import (
     CreateFavoriteListRequest,
     FavoriteListResponse,
     CreateGroupRequest,
+    UpdateGroupRequest,
     GroupResponse,
     GroupDetailResponse,
     GroupMemberPublic,
@@ -340,6 +341,26 @@ async def create_group(data: CreateGroupRequest, creator_id: str) -> GroupRespon
         {"_id": doc["_id"]}, {"$set": {"conversation_id": conversation_id}}
     )
     doc["conversation_id"] = conversation_id
+
+    return _group_to_response(doc)
+
+
+async def update_group(group_id: str, data: UpdateGroupRequest, user_id: str) -> GroupResponse:
+    db = get_database()
+    doc = await db[GROUPS_COLLECTION].find_one({"_id": ObjectId(group_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Groupe introuvable")
+    if doc["creator_id"] != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seul le créateur du groupe peut modifier ses paramètres",
+        )
+
+    updates = data.model_dump(exclude_unset=True)
+    if updates:
+        updates["updated_at"] = datetime.utcnow()
+        await db[GROUPS_COLLECTION].update_one({"_id": ObjectId(group_id)}, {"$set": updates})
+        doc.update(updates)
 
     return _group_to_response(doc)
 

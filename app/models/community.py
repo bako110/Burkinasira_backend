@@ -114,6 +114,30 @@ class QuestionAnswer(BaseModel):
         populate_by_name = True
 
 
+class LiveSessionStatus(str, Enum):
+    LIVE = "live"
+    ENDED = "ended"
+
+
+class LiveSession(BaseModel):
+    """Session de live communautaire (LiveKit) — un touriste diffuse en direct,
+    éventuellement rattaché à un groupe de voyageurs."""
+    id: Optional[str] = Field(default=None, alias="_id")
+    host_id: str
+    title: str
+    description: Optional[str] = None
+    group_id: Optional[str] = None
+    room_name: str  # nom de la room LiveKit (unique, dérivé de l'_id)
+    status: LiveSessionStatus = LiveSessionStatus.LIVE
+    viewer_count: int = 0
+    started_at: datetime = Field(default_factory=datetime.utcnow)
+    ended_at: Optional[datetime] = None
+
+    class Config:
+        populate_by_name = True
+        use_enum_values = True
+
+
 class ReportedContentType(str, Enum):
     POST = "post"
     COMMENT = "comment"

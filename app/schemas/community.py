@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from app.models.destination import GeoPoint
-from app.models.community import PostType, QuestionStatus, ReportedContentType
+from app.models.community import PostType, QuestionStatus, ReportedContentType, LiveSessionStatus
 
 
 class CreatePostRequest(BaseModel):
@@ -79,6 +79,16 @@ class CreateGroupRequest(BaseModel):
     is_public: bool = True
 
 
+class UpdateGroupRequest(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=2, max_length=100)
+    description: Optional[str] = None
+    cover_photo: Optional[str] = None
+    region: Optional[str] = None
+    province: Optional[str] = None
+    theme: Optional[str] = None
+    is_public: Optional[bool] = None
+
+
 class GroupResponse(BaseModel):
     id: str
     name: str
@@ -147,3 +157,31 @@ class ReportContentRequest(BaseModel):
     content_type: ReportedContentType
     content_id: str
     reason: str = Field(..., min_length=3)
+
+
+class StartLiveRequest(BaseModel):
+    title: str = Field(..., min_length=2, max_length=120)
+    description: Optional[str] = None
+    group_id: Optional[str] = None
+
+
+class LiveSessionResponse(BaseModel):
+    id: str
+    host_id: str
+    host_name: Optional[str] = None
+    host_avatar_url: Optional[str] = None
+    title: str
+    description: Optional[str] = None
+    group_id: Optional[str] = None
+    room_name: str
+    status: LiveSessionStatus
+    viewer_count: int
+    started_at: datetime
+    ended_at: Optional[datetime] = None
+
+
+class LiveTokenResponse(BaseModel):
+    url: str
+    token: str
+    room_name: str
+    can_publish: bool
