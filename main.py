@@ -13,7 +13,7 @@ from app.api.v1.routes import (
     passport, business, edu, diaspora, international, bookings, messaging,
     pro_workspace, operators, verified, impact, revenue_split,
     payment_security, notifications, offline, admin, data_quality, analytics,
-    integrations, privacy, home, media, reviews, memories, ws,
+    integrations, privacy, home, media, reviews, memories, ws, awards,
 )
 import logging
 
@@ -91,6 +91,7 @@ async def health_check():
 # ROUTES AUTHENTIFICATION (TOUJOURS EN PREMIER)
 # ============================================
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
+app.include_router(awards.router, prefix=settings.API_V1_PREFIX)
 
 # ============================================
 # ROUTES EXPLORER / FICHE LIEU (§3, §4)
