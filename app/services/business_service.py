@@ -20,6 +20,21 @@ INVOICES_COLLECTION = "business_invoices"
 PARTICIPANTS_COLLECTION = "business_event_participants"
 
 
+# --- Accès ---
+
+async def _get_quote_doc_for_access(quote_id: str, user_id: str, is_staff: bool) -> dict:
+    """Charge une demande de devis en vérifiant que l'utilisateur en est le demandeur (ou du personnel habilité)."""
+    db = get_database()
+    if not ObjectId.is_valid(quote_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demande de devis introuvable")
+    doc = await db[QUOTES_COLLECTION].find_one({"_id": ObjectId(quote_id)})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demande de devis introuvable")
+    if doc["requester_id"] != user_id and not is_staff:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Accès non autorisé")
+    return doc
+
+
 # --- Devis groupé ---
 
 def _quote_to_response(doc: dict) -> QuoteRequestResponse:
@@ -96,6 +111,23 @@ async def update_quote_request(quote_id: str, data: UpdateQuoteRequest) -> Quote
     return _quote_to_response(doc)
 
 
+async def respond_to_quote(quote_id: str, user_id: str, accept: bool) -> QuoteRequestResponse:
+    """Le demandeur accepte ou refuse le devis qu'il a reçu."""
+    db = get_database()
+    doc = await _get_quote_doc_for_access(quote_id, user_id, is_staff=False)
+    if doc.get("status") != QuoteRequestStatus.QUOTED.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cette demande n'a pas de devis en attente de réponse",
+        )
+    new_status = QuoteRequestStatus.ACCEPTED.value if accept else QuoteRequestStatus.DECLINED.value
+    await db[QUOTES_COLLECTION].update_one(
+        {"_id": doc["_id"]}, {"$set": {"status": new_status, "updated_at": datetime.utcnow()}}
+    )
+    doc["status"] = new_status
+    return _quote_to_response(doc)
+
+
 # --- Facturation entreprise ---
 
 def _invoice_to_response(doc: dict) -> InvoiceResponse:
@@ -129,8 +161,9 @@ async def create_invoice(data: CreateInvoiceRequest) -> InvoiceResponse:
     return _invoice_to_response(doc)
 
 
-async def list_invoices_for_quote(quote_id: str) -> list:
+async def list_invoices_for_quote(quote_id: str, user_id: str, is_staff: bool) -> list:
     db = get_database()
+    await _get_quote_doc_for_access(quote_id, user_id, is_staff)
     docs = await db[INVOICES_COLLECTION].find({"quote_request_id": quote_id}).to_list(length=None)
     return [_invoice_to_response(d) for d in docs]
 
@@ -160,13 +193,9 @@ def _participant_to_response(doc: dict) -> ParticipantResponse:
     )
 
 
-async def add_participant(quote_id: str, data: AddParticipantRequest) -> ParticipantResponse:
+async def add_participant(quote_id: str, data: AddParticipantRequest, user_id: str, is_staff: bool) -> ParticipantResponse:
     db = get_database()
-    if not ObjectId.is_valid(quote_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demande de devis introuvable")
-    quote = await db[QUOTES_COLLECTION].find_one({"_id": ObjectId(quote_id)})
-    if not quote:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demande de devis introuvable")
+    await _get_quote_doc_for_access(quote_id, user_id, is_staff)
 
     doc = data.model_dump()
     doc["quote_request_id"] = quote_id
@@ -176,16 +205,19 @@ async def add_participant(quote_id: str, data: AddParticipantRequest) -> Partici
     return _participant_to_response(doc)
 
 
-async def list_participants(quote_id: str) -> list:
+async def list_participants(quote_id: str, user_id: str, is_staff: bool) -> list:
     db = get_database()
+    await _get_quote_doc_for_access(quote_id, user_id, is_staff)
     docs = await db[PARTICIPANTS_COLLECTION].find({"quote_request_id": quote_id}).to_list(length=None)
     return [_participant_to_response(d) for d in docs]
 
 
-async def remove_participant(participant_id: str) -> None:
+async def remove_participant(participant_id: str, user_id: str, is_staff: bool) -> None:
     db = get_database()
     if not ObjectId.is_valid(participant_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Participant introuvable")
-    result = await db[PARTICIPANTS_COLLECTION].delete_one({"_id": ObjectId(participant_id)})
-    if result.deleted_count == 0:
+    participant = await db[PARTICIPANTS_COLLECTION].find_one({"_id": ObjectId(participant_id)})
+    if not participant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Participant introuvable")
+    await _get_quote_doc_for_access(participant["quote_request_id"], user_id, is_staff)
+    await db[PARTICIPANTS_COLLECTION].delete_one({"_id": participant["_id"]})

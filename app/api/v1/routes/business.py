@@ -13,10 +13,17 @@ from app.schemas.business import (
     UpdateInvoiceStatusRequest,
     AddParticipantRequest,
     ParticipantResponse,
+    QuoteDecisionRequest,
 )
 from app.services import business_service
 
 router = APIRouter(prefix="/business", tags=["Tourisme d'affaires — BurkinaSira Business"])
+
+STAFF_ROLES = (UserRole.ADMIN, UserRole.MODERATOR, UserRole.PROVIDER)
+
+
+def _is_staff(user: TokenPayload) -> bool:
+    return user.role in STAFF_ROLES
 
 
 @router.post("/quotes", response_model=QuoteRequestResponse, status_code=status.HTTP_201_CREATED)
@@ -59,6 +66,16 @@ async def update_quote_request(
     return await business_service.update_quote_request(quote_id, data)
 
 
+@router.post("/quotes/{quote_id}/respond", response_model=QuoteRequestResponse)
+async def respond_to_quote(
+    quote_id: str,
+    data: QuoteDecisionRequest,
+    current_user: TokenPayload = Depends(get_current_user),
+):
+    """Le demandeur accepte ou refuse le devis reçu."""
+    return await business_service.respond_to_quote(quote_id, current_user.sub, data.accept)
+
+
 @router.post("/quotes/{quote_id}/participants", response_model=ParticipantResponse, status_code=status.HTTP_201_CREATED)
 async def add_participant(
     quote_id: str,
@@ -66,19 +83,19 @@ async def add_participant(
     current_user: TokenPayload = Depends(get_current_user),
 ):
     """Gérer les participants d'un événement d'entreprise."""
-    return await business_service.add_participant(quote_id, data)
+    return await business_service.add_participant(quote_id, data, current_user.sub, _is_staff(current_user))
 
 
 @router.get("/quotes/{quote_id}/participants", response_model=list)
 async def list_participants(quote_id: str, current_user: TokenPayload = Depends(get_current_user)):
     """Liste des participants."""
-    return await business_service.list_participants(quote_id)
+    return await business_service.list_participants(quote_id, current_user.sub, _is_staff(current_user))
 
 
 @router.delete("/participants/{participant_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_participant(participant_id: str, current_user: TokenPayload = Depends(get_current_user)):
     """Retirer un participant."""
-    await business_service.remove_participant(participant_id)
+    await business_service.remove_participant(participant_id, current_user.sub, _is_staff(current_user))
 
 
 @router.post("/invoices", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED)
@@ -93,7 +110,7 @@ async def create_invoice(
 @router.get("/quotes/{quote_id}/invoices", response_model=list)
 async def list_invoices_for_quote(quote_id: str, current_user: TokenPayload = Depends(get_current_user)):
     """Gérer la facturation entreprise d'une demande de devis."""
-    return await business_service.list_invoices_for_quote(quote_id)
+    return await business_service.list_invoices_for_quote(quote_id, current_user.sub, _is_staff(current_user))
 
 
 @router.patch("/invoices/{invoice_id}", response_model=InvoiceResponse)

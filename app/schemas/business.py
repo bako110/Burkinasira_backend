@@ -68,3 +68,8 @@ class ParticipantResponse(BaseModel):
     full_name: str
     email: Optional[str] = None
     phone: Optional[str] = None
+
+
+class QuoteDecisionRequest(BaseModel):
+    """Décision du demandeur sur le devis reçu."""
+    accept: bool
